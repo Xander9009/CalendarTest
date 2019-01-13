@@ -1,0 +1,16 @@
+Theoretically needed steps:
+Step 1: Get a list of saved users.
+Step 2a: Choose an existing user or choose to add a new one.
+Step 2b: If adding a new user, add user to list.
+Step 3a: Load user's tokens, if they exist.
+Step 3b: If tokens don't exist, authorize new tokens.
+Step 4: Use tokens to access TSheets and mirror updates to Google Calendar.
+
+
+
+Step 1: Get a list of saved users.
+A file containing the list of known users needs to exist. Likely simply "users.json".
+That file needs to contain each user's:
+	display name -> selection dialog
+	ID -> used in the saving of both Google Calendar and TSheets token filenames.
+Getting the list is easy enough.
