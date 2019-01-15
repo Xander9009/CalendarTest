@@ -18,24 +18,9 @@ namespace CalendarTest
             notificationIcon.Visible = false;
         }
 
-        private void btnNewEvent_Click(object sender, EventArgs e)
-        {
-            Program.NewEvent();
-        }
-
-        private void btnLoadUser_Click(object sender, EventArgs e)
-        {
-            Program.LoadUser();
-        }
-
         private void btnNewUser_Click(object sender, EventArgs e)
         {
             Program.NewUser();
-        }
-
-        private void btnChangeUser_Click(object sender, EventArgs e)
-        {
-            Program.ChangeUser();
         }
 
         private bool maxedWhenTrayed = false;
@@ -59,6 +44,16 @@ namespace CalendarTest
             }
             notificationIcon.Visible = false;
             this.ShowInTaskbar = true;
+        }
+
+        private void UserListView_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            Program.LoadUser();
+        }
+
+        private void lblURL_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            System.Diagnostics.Process.Start("http://" + (sender as Control).Text);
         }
     }
 }

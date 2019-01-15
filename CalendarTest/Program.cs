@@ -31,18 +31,12 @@ namespace CalendarTest
         // at ~/.credentials/calendar-dotnet-quickstart.json
         static string[] Scopes = { CalendarService.Scope.CalendarEvents };
         static string ApplicationName = "Google Calendar API .NET Quickstart";
-        static UserCredential credential;
-        static CalendarService service;
-
-        //TSheets variables
-        private static ConnectionInfo _connection;
-        private static IOAuth2 _authProvider;
-
+        
         //Other variables
         private static List<User> Users = new List<User>();
+        private static List<SavableUserData> SavableUsers = new List<SavableUserData>();
         private static Form1 form;
-        private static User CurrentUser;
-
+        public static User CurrentUser;
 
         [STAThread]
         static void Main()
@@ -66,15 +60,15 @@ namespace CalendarTest
                 using (StreamReader file = File.OpenText("users.json"))
                 {
                     JsonSerializer serializer = new JsonSerializer();
-                    Users = (List<User>)serializer.Deserialize(file, typeof(List<User>));
-                    if (Users.Count > 0)
+                    SavableUsers = (List<SavableUserData>)serializer.Deserialize(file, typeof(List<SavableUserData>));
+                    if (SavableUsers.Count > 0)
                     {
-                        form.Controls.Find("btnLoadUser", true)[0].Enabled = true;
                         ListView UserListView = form.Controls.Find("UserListView", true)[0] as ListView;
                         UserListView.Items.Clear();
-                        foreach (User user in Users)
+                        foreach (SavableUserData user in SavableUsers)
                         {
                             UserListView.Items.Add(user.DisplayName);
+                            Users.Add(new User(user.DisplayName, user.ID));
                         }
                         UserListView.Select();
                         UserListView.Items[0].Selected = true;
@@ -86,9 +80,9 @@ namespace CalendarTest
         }
 
         //Google Calendar methods
-        static public void NewEvent()
+        static public void NewEvent(User user)
         {
-            EventsResource.InsertRequest request = new EventsResource.InsertRequest(service,
+            EventsResource.InsertRequest request = new EventsResource.InsertRequest(user.GoogleService,
                 new Event()
                 {
                     Description = "New test event",
@@ -107,22 +101,22 @@ namespace CalendarTest
         /// Shows how to set up authentication to authenticate the user in an embedded browser form
         /// and get an OAuth2 token by prompting the user for credentials.
         /// </summary>
-        private static void AuthenticateWithBrowser()
+        private static void AuthenticateWithBrowser(User user)
         {
             //First, check if there's a saved token that we can use.
 
             string savedToken;
             UserAuthentication userAuthProvider;
-            if (File.Exists(CurrentUser.ID + "TStoken.json"))
+            if (File.Exists(user.ID + "TStoken.json"))
             {
-                using (StreamReader file = File.OpenText(CurrentUser.ID + "TStoken.json"))
+                using (StreamReader file = File.OpenText(user.ID + "TStoken.json"))
                 {
                     JsonSerializer serializer = new JsonSerializer();
                     savedToken = (string)serializer.Deserialize(file, typeof(string));
 
                     // This can be restored into a UserAuthentication object later to reuse:
                     OAuthToken restoredToken = OAuthToken.FromJson(savedToken);
-                    userAuthProvider = new UserAuthentication(_connection, restoredToken);
+                    userAuthProvider = new UserAuthentication(user.TSheetsConnection, restoredToken);
                 }
             }
             else
@@ -130,10 +124,10 @@ namespace CalendarTest
                 // The UserAuthentication class will handle the OAuth2 desktop
                 // authentication flow using an embedded WebBrowser form, 
                 // cache the returned token for later API usage, and handle token refreshes.
-                userAuthProvider = new UserAuthentication(_connection);
+                userAuthProvider = new UserAuthentication(user.TSheetsConnection);
             }
             
-            _authProvider = userAuthProvider;
+            user.TSheetsAuthProvider = userAuthProvider;
 
             // optionally register an event handler to be notified if/when the auth
             // token changes
@@ -159,7 +153,7 @@ namespace CalendarTest
             // to manually retrieve the most current token.
             savedToken = authToken.ToJson();
 
-            using (StreamWriter file = File.CreateText(CurrentUser.ID + "TStoken.json"))
+            using (StreamWriter file = File.CreateText(user.ID + "TStoken.json"))
             {
                 JsonSerializer serializer = new JsonSerializer();
                 serializer.Serialize(file, savedToken);
@@ -183,26 +177,11 @@ namespace CalendarTest
         }
 
         /// <summary>
-        /// Shows how to get current logged in user information
-        /// </summary>
-        private static void GetUserInfoSample()
-        {
-            var tsheetsApi = new RestClient(_connection, _authProvider);
-            var userData = tsheetsApi.Get(ObjectType.CurrentUser);
-            var responseObject = JObject.Parse(userData);
-            var userObject = responseObject.SelectToken("results.users.*");
-
-            form.Controls.Find("lblCurrentUser", true)[0].Text = string.Format("{0} {1}", userObject["first_name"], userObject["last_name"]);
-            form.Controls.Find("lblEmail", true)[0].Text = userObject["email"].ToString();
-            form.Controls.Find("lblURL", true)[0].Text = userObject["client_url"].ToString();
-        }
-
-        /// <summary>
         /// Shows how to get all users for the company
         /// </summary>
-        private static void GetUsersSample()
+        private static void GetUsersSample(User user)
         {
-            var tsheetsApi = new RestClient(_connection, _authProvider);
+            var tsheetsApi = new RestClient(user.TSheetsConnection, user.TSheetsAuthProvider);
             var userData = tsheetsApi.Get(ObjectType.Users);
             var responseObject = JObject.Parse(userData);
 
@@ -224,9 +203,9 @@ namespace CalendarTest
         /// about the selected timesheets. API users should use the supplemental data when available
         /// rather than making additional calls to the server to receive that information.
         /// </summary>
-        private static void GetTimesheetsSample()
+        private static void GetTimesheetsSample(User user)
         {
-            var tsheetsApi = new RestClient(_connection, _authProvider);
+            var tsheetsApi = new RestClient(user.TSheetsConnection, user.TSheetsAuthProvider);
 
             var filters = new Dictionary<string, string>();
             filters.Add("start_date", "2014-01-01");
@@ -252,9 +231,9 @@ namespace CalendarTest
         /// This sample shows how to request all available jobcodes using paging filters to retrieve
         /// the records this way.
         /// </summary>
-        private static void GetJobcodesByPageSample()
+        private static void GetJobcodesByPageSample(User user)
         {
-            var tsheetsApi = new RestClient(_connection, _authProvider);
+            var tsheetsApi = new RestClient(user.TSheetsConnection, user.TSheetsAuthProvider);
             var filters = new Dictionary<string, string>();
 
             // start by requesting the first page
@@ -296,9 +275,9 @@ namespace CalendarTest
         /// Shows how to create a user, create a jobcode, log time against it, and then run a project report
         /// that shows them
         /// </summary>
-        public static void ProjectReportSample()
+        public static void ProjectReportSample(User user)
         {
-            var tsheetsApi = new RestClient(_connection, _authProvider);
+            var tsheetsApi = new RestClient(user.TSheetsConnection, user.TSheetsAuthProvider);
 
             DateTime today = DateTime.Now;
             string todayString = today.ToString("yyyy-MM-dd");
@@ -352,9 +331,9 @@ namespace CalendarTest
         /// <summary>
         /// Shows how to add, edit, and delete a timesheet
         /// </summary>
-        private static void AddEditDeleteTimesheetSample()
+        private static void AddEditDeleteTimesheetSample(User user)
         {
-            var tsheetsApi = new RestClient(_connection, _authProvider);
+            var tsheetsApi = new RestClient(user.TSheetsConnection, user.TSheetsAuthProvider);
 
             DateTime today = DateTime.Now;
             string todayString = today.ToString("yyyy-MM-dd");
@@ -443,47 +422,6 @@ namespace CalendarTest
             return (int)addedJobCode["id"];
         }
 
-        //Google Calendar methods
-
-        /// <summary>
-        /// Lists the next 10 upcoming events from Google Calendar.
-        /// </summary>
-        private static void GoogleCalendarGetEventsSample()
-        {
-            //Example calendar event request. First, we need to get a list of events to see which TSheets events have been mirrored already.
-            // Define parameters of request.
-            EventsResource.ListRequest request = service.Events.List("primary");
-            request.TimeMin = DateTime.Now;
-            request.ShowDeleted = false;
-            request.SingleEvents = true;
-            request.MaxResults = 10;
-            request.OrderBy = EventsResource.ListRequest.OrderByEnum.StartTime;
-
-            // List events. Place event details in the listview.
-            Events events = request.Execute();
-
-            var eventsListView = (ListView)form.Controls.Find("EventsList", true)[0];
-            var eventsList = new List<ListViewItem>();
-            if (events.Items != null && events.Items.Count > 0)
-            {
-                foreach (var eventItem in events.Items)
-                {
-                    string when = eventItem.Start.DateTime.ToString();
-                    if (String.IsNullOrEmpty(when))
-                    {
-                        when = eventItem.Start.Date;
-                    }
-                    var eventListViewItem = new ListViewItem(eventItem.Summary);
-                    eventListViewItem.SubItems.Add(when);
-                    eventsListView.Items.Add(eventListViewItem);
-                }
-            }
-            else
-            {
-                eventsList.Add(new ListViewItem(new string[] { "No upcoming events found", "" }));
-            }
-        }
-
         /// <summary>
         /// Helper to create a random user
         /// </summary>
@@ -505,6 +443,48 @@ namespace CalendarTest
             return (int)addedUser["id"];
         }
 
+        //Google Calendar methods
+
+        /// <summary>
+        /// Lists the next 10 upcoming events from Google Calendar.
+        /// </summary>
+        private static void GoogleCalendarListEvents(User user)
+        {
+            //Example calendar event request. First, we need to get a list of events to see which TSheets events have been mirrored already.
+            // Define parameters of request.
+            EventsResource.ListRequest request = user.GoogleService.Events.List("primary");
+            request.TimeMin = DateTime.Now;
+            request.ShowDeleted = false;
+            request.SingleEvents = true;
+            request.MaxResults = 10;
+            request.OrderBy = EventsResource.ListRequest.OrderByEnum.StartTime;
+
+            // List events. Place event details in the listview.
+            Events events = request.Execute();
+
+            var eventsListView = (ListView)form.Controls.Find("GoogleEventsList", true)[0];
+            eventsListView.Items.Clear();
+            if (events.Items != null && events.Items.Count > 0)
+            {
+                foreach (var eventItem in events.Items)
+                {
+                    string when = eventItem.Start.DateTime.ToString();
+                    if (String.IsNullOrEmpty(when))
+                    {
+                        when = eventItem.Start.Date;
+                    }
+                    var eventListViewItem = new ListViewItem(eventItem.Summary);
+                    eventListViewItem.SubItems.Add(when);
+                    eventsListView.Items.Add(eventListViewItem);
+                }
+            }
+            else
+            {
+                var eventListViewItem = new ListViewItem(new string[] { "No upcoming events found", "" });
+                eventsListView.Items.Add(eventListViewItem);
+            }
+        }
+
         internal static void LoadUser()
         {
             ListView UserListView = form.Controls.Find("UserListView", true)[0] as ListView;
@@ -518,13 +498,10 @@ namespace CalendarTest
                         if (user.DisplayName == DisplayName)
                         {
                             CurrentUser = user;
+                            LoadUser(user);
                             break;
                         }
                     }
-                }
-                if (CurrentUser != null)
-                {
-                    LoadUser(CurrentUser);
                 }
             }
         }
@@ -535,27 +512,66 @@ namespace CalendarTest
             GoogleAuthenticate(user);
             TSheetsAuthenticate(user);
 
-            form.Controls.Find("UserSelectionPanel", true)[0].Enabled = false;
-            form.Controls.Find("UserSelectionPanel", true)[0].Visible = false;
-
-            //Now, run the samples.
+            LoadUserLabelInfo(user);
 
             //Google Calendar samples
-            GoogleCalendarGetEventsSample();
+            GoogleCalendarListEvents(user);
 
             //TSheets samples
+            TSheetsListTimesheets(user);
             //Example methods that pull in information. Only posts results to console.
-            GetUserInfoSample();
-            GetUsersSample();
-            GetTimesheetsSample();
+            //GetUsersSample(user);
+            //GetTimesheetsSample(user);
 
             //These two samples create users and job codes which then have to be cleaned
             //up manually (and multiple users aren't available for free accounts, anyway).
             //So, they've been disabled. However, they're left intact so they can be examined.
-            //ProjectReportSample();
-            //AddEditDeleteTimesheetSample();
+            //ProjectReportSample(user);
+            //AddEditDeleteTimesheetSample(user);
 
-            GetJobcodesByPageSample();
+            //GetJobcodesByPageSample(user);
+        }
+
+        private static void LoadUserLabelInfo(User user)
+        {
+            var tsheetsApi = new RestClient(user.TSheetsConnection, user.TSheetsAuthProvider);
+            var userData = tsheetsApi.Get(ObjectType.CurrentUser);
+            var responseObject = JObject.Parse(userData);
+            var userObject = responseObject.SelectToken("results.users.*");
+
+            form.Controls.Find("lblCurrentUser", true)[0].Text = string.Format("{0} {1}", userObject["first_name"], userObject["last_name"]);
+            form.Controls.Find("lblEmail", true)[0].Text = userObject["email"].ToString();
+            form.Controls.Find("lblURL", true)[0].Text = userObject["client_url"].ToString() + ".tsheets.com";
+            LinkLabel L = form.Controls.Find("lblURL", true)[0] as LinkLabel;
+            L.LinkArea = new LinkArea(0, L.Text.Length);
+        }
+
+        private static void TSheetsListTimesheets(User user)
+        {
+            ListView TSheetsEventList = form.Controls.Find("TSheetsEventsList", true)[0] as ListView;
+            TSheetsEventList.Items.Clear();
+
+            var tsheetsApi = new RestClient(user.TSheetsConnection, user.TSheetsAuthProvider);
+
+            var filters = new Dictionary<string, string>();
+            filters.Add("start_date", "2019-1-12");
+            filters.Add("end_date", "2019-2-1");
+            var timesheetData = tsheetsApi.Get(ObjectType.Timesheets, filters);
+            var timesheetsObject = JObject.Parse(timesheetData);
+            var allTimeSheets = timesheetsObject.SelectTokens("results.timesheets.*");
+
+            var jobcodesData = tsheetsApi.Get(ObjectType.Jobcodes);
+            var jobcodesObject = JObject.Parse(jobcodesData)["results"]["jobcodes"];
+            
+            foreach (var timesheet in allTimeSheets)
+            {
+                var tsUser = timesheetsObject.SelectToken("supplemental_data.users." + timesheet["user_id"]);
+
+                var eventListViewItem = new ListViewItem(string.Format("{0} {1}", tsUser["first_name"], tsUser["last_name"]));
+                eventListViewItem.SubItems.Add(string.Format("{0:g}-{1:t}", timesheet["start"], timesheet["end"]));
+                eventListViewItem.SubItems.Add(string.Format("{0}", jobcodesObject[timesheet["jobcode_id"].ToString()]["name"]));
+                TSheetsEventList.Items.Add(eventListViewItem);
+            }
         }
 
         internal static void NewUser()
@@ -572,37 +588,14 @@ namespace CalendarTest
                     serializer.Serialize(file, Users);
                 }
                 LoadUser(user);
+
+                ListView UserListView = form.Controls.Find("UserListView", true)[0] as ListView;
+                UserListView.Items.Add(user.DisplayName);
+                UserListView.Items[UserListView.Items.Count - 1].Selected = true;
             }
         }
 
-        internal static void ChangeUser()
-        {
-            CurrentUser = null;
-            if (File.Exists("users.json"))
-            {
-                using (StreamReader file = File.OpenText("users.json"))
-                {
-                    JsonSerializer serializer = new JsonSerializer();
-                    Users = (List<User>)serializer.Deserialize(file, typeof(List<User>));
-                    if (Users.Count > 0)
-                    {
-                        form.Controls.Find("btnLoadUser", true)[0].Enabled = true;
-                        ListView UserListView = form.Controls.Find("UserListView", true)[0] as ListView;
-                        UserListView.Items.Clear();
-                        foreach (User user in Users)
-                        {
-                            UserListView.Items.Add(user.DisplayName);
-                        }
-                        UserListView.Select();
-                        UserListView.Items[0].Selected = true;
-                    }
-                }
-            }
-            form.Controls.Find("UserSelectionPanel", true)[0].Enabled = true;
-            form.Controls.Find("UserSelectionPanel", true)[0].Visible = true;
-        }
-
-        static private void GoogleAuthenticate(User user)
+        static internal void GoogleAuthenticate(User user)
         {
             //This loads user token from file, but isn't user-specific, yet.
             using (var stream =
@@ -611,7 +604,7 @@ namespace CalendarTest
                 // The file token.json stores the user's access and refresh tokens, and is created
                 // automatically when the authorization flow completes for the first time.
                 string credPath = user.ID + "GCtoken.json";
-                credential = GoogleWebAuthorizationBroker.AuthorizeAsync(
+                user.GoogleCredential = GoogleWebAuthorizationBroker.AuthorizeAsync(
                     GoogleClientSecrets.Load(stream).Secrets,
                     Scopes,
                     "user",
@@ -621,17 +614,15 @@ namespace CalendarTest
             }
 
             // Create Google Calendar API service.
-            service = new CalendarService(new BaseClientService.Initializer()
+            user.GoogleService = new CalendarService(new BaseClientService.Initializer()
             {
-                HttpClientInitializer = credential,
+                HttpClientInitializer = user.GoogleCredential,
                 ApplicationName = ApplicationName,
             });
         }
 
-        static private void TSheetsAuthenticate(User user)
+        static internal void TSheetsAuthenticate(User user)
         {
-            //TSheets setup
-
             TSheetsCredentials TSCreds = null;
             if (File.Exists("tsheetscredentials.json"))
             {
@@ -644,11 +635,11 @@ namespace CalendarTest
             if (TSCreds != null)
             {
                 // set up the ConnectionInfo object which tells the API how to connect to the server
-                _connection = new ConnectionInfo(TSCreds._baseUri, TSCreds._clientId, TSCreds._redirectUri, TSCreds._clientSecret);
+                user.TSheetsConnection = new ConnectionInfo(TSCreds._baseUri, TSCreds._clientId, TSCreds._redirectUri, TSCreds._clientSecret);
 
                 // AuthenticateWithBrowser will do a full OAuth2 forms based authentication in a
                 //web browser form and prompt the user for credentials.
-                AuthenticateWithBrowser();
+                AuthenticateWithBrowser(user);
             }
         }
     }
@@ -658,17 +649,48 @@ namespace CalendarTest
         public string DisplayName;
         public int ID;
 
+        //Google Calendar variables
+        public UserCredential GoogleCredential;
+        public CalendarService GoogleService;
+
+        //TSheets variables
+        public ConnectionInfo TSheetsConnection;
+        public IOAuth2 TSheetsAuthProvider;
+
         public User(string displayName)
         {
             DisplayName = displayName;
             ID = (new Random()).Next(1, 999999999);
+            InitializeAuths(this);
         }
+
         [JsonConstructor]
         public User(string displayName, int id)
         {
             DisplayName = displayName;
             ID = id;
+            InitializeAuths(this);
         }
+
+        private void InitializeAuths(User user)
+        {
+            Program.GoogleAuthenticate(user);
+            Program.TSheetsAuthenticate(user);
+        }
+
+        public SavableUserData GetSavableData()
+        {
+            var SavableData = new SavableUserData();
+            SavableData.ID = ID;
+            SavableData.DisplayName = DisplayName;
+            return SavableData;
+        }
+    }
+
+    internal class SavableUserData
+    {
+        public string DisplayName;
+        public int ID;
     }
 
     internal class TSheetsCredentials
