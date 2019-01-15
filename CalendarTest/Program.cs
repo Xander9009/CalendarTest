@@ -3,19 +3,19 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.IO;
+using System.Text;
+using System.Threading;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Calendar.v3.Data;
 using Google.Apis.Services;
 using Google.Apis.Util.Store;
-using System.IO;
-using System.Text;
-using System.Threading;
 
-using Newtonsoft.Json.Linq;
 using TSheets;
-using Newtonsoft.Json;
 
 namespace CalendarTest
 {
@@ -469,10 +469,26 @@ namespace CalendarTest
                 foreach (var eventItem in events.Items)
                 {
                     string when = eventItem.Start.DateTime.ToString();
-                    if (String.IsNullOrEmpty(when))
+                    if (when != "")
                     {
-                        when = eventItem.Start.Date;
+                        when = when.Substring(0, when.Length - 6) + " " + when.Substring(when.Length - 2, 2);
                     }
+                    if (when == "")
+                    {
+                        when = eventItem.Start.Date.ToString();
+                    }
+                    try
+                    {
+                        var Hour = eventItem.End.DateTime.Value.Hour;
+                        var Minute = eventItem.End.DateTime.Value.Minute;
+                        var Period = "AM";
+                        if (Hour > 12)
+                        {
+                            Hour -= 12;
+                            Period = "PM";
+                        }
+                        when += string.Format("-{0}:{1:00} {2}", Hour, Minute, Period);
+                    } catch { }
                     var eventListViewItem = new ListViewItem(eventItem.Summary);
                     eventListViewItem.SubItems.Add(when);
                     eventsListView.Items.Add(eventListViewItem);
