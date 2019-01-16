@@ -32,7 +32,7 @@
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             this.GoogleEventsList = new System.Windows.Forms.ListView();
             this.Description = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
-            this.When = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.Time = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.btnNewUser = new System.Windows.Forms.Button();
             this.UserListView = new System.Windows.Forms.ListView();
             this.label6 = new System.Windows.Forms.Label();
@@ -45,17 +45,20 @@
             this.trayToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.notificationIcon = new System.Windows.Forms.NotifyIcon(this.components);
             this.TSheetsEventsList = new System.Windows.Forms.ListView();
-            this.label1 = new System.Windows.Forms.Label();
-            this.label3 = new System.Windows.Forms.Label();
             this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader2 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
-            this.columnHeader3 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.label1 = new System.Windows.Forms.Label();
+            this.label3 = new System.Windows.Forms.Label();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.splitContainer2 = new System.Windows.Forms.SplitContainer();
             this.splitContainer3 = new System.Windows.Forms.SplitContainer();
             this.splitContainer4 = new System.Windows.Forms.SplitContainer();
             this.splitContainer5 = new System.Windows.Forms.SplitContainer();
+            this.btnSync = new System.Windows.Forms.Button();
             this.lblURL = new System.Windows.Forms.LinkLabel();
+            this.btnRefresh = new System.Windows.Forms.Button();
+            this.label5 = new System.Windows.Forms.Label();
+            this.lblCalendar = new System.Windows.Forms.LinkLabel();
             this.menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
@@ -83,11 +86,11 @@
             // 
             this.GoogleEventsList.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.Description,
-            this.When});
+            this.Time});
             this.GoogleEventsList.Dock = System.Windows.Forms.DockStyle.Fill;
             this.GoogleEventsList.Location = new System.Drawing.Point(0, 0);
             this.GoogleEventsList.Name = "GoogleEventsList";
-            this.GoogleEventsList.Size = new System.Drawing.Size(314, 328);
+            this.GoogleEventsList.Size = new System.Drawing.Size(314, 319);
             this.GoogleEventsList.TabIndex = 0;
             this.GoogleEventsList.UseCompatibleStateImageBehavior = false;
             this.GoogleEventsList.View = System.Windows.Forms.View.Details;
@@ -95,12 +98,12 @@
             // Description
             // 
             this.Description.Text = "Description";
-            this.Description.Width = 189;
+            this.Description.Width = 95;
             // 
-            // When
+            // Time
             // 
-            this.When.Text = "When";
-            this.When.Width = 167;
+            this.Time.Text = "Time";
+            this.Time.Width = 215;
             // 
             // btnNewUser
             // 
@@ -129,7 +132,7 @@
             // label6
             // 
             this.label6.AutoSize = true;
-            this.label6.Location = new System.Drawing.Point(3, 49);
+            this.label6.Location = new System.Drawing.Point(40, 49);
             this.label6.Name = "label6";
             this.label6.Size = new System.Drawing.Size(29, 13);
             this.label6.TabIndex = 8;
@@ -146,7 +149,7 @@
             // label4
             // 
             this.label4.AutoSize = true;
-            this.label4.Location = new System.Drawing.Point(3, 25);
+            this.label4.Location = new System.Drawing.Point(37, 25);
             this.label4.Name = "label4";
             this.label4.Size = new System.Drawing.Size(32, 13);
             this.label4.TabIndex = 6;
@@ -205,54 +208,44 @@
             // 
             this.TSheetsEventsList.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.columnHeader1,
-            this.columnHeader2,
-            this.columnHeader3});
+            this.columnHeader2});
             this.TSheetsEventsList.Dock = System.Windows.Forms.DockStyle.Fill;
             this.TSheetsEventsList.Location = new System.Drawing.Point(0, 0);
             this.TSheetsEventsList.Name = "TSheetsEventsList";
-            this.TSheetsEventsList.Size = new System.Drawing.Size(270, 328);
+            this.TSheetsEventsList.Size = new System.Drawing.Size(270, 319);
             this.TSheetsEventsList.TabIndex = 10;
             this.TSheetsEventsList.UseCompatibleStateImageBehavior = false;
             this.TSheetsEventsList.View = System.Windows.Forms.View.Details;
             // 
+            // columnHeader1
+            // 
+            this.columnHeader1.Text = "Description";
+            this.columnHeader1.Width = 99;
+            // 
+            // columnHeader2
+            // 
+            this.columnHeader2.Text = "Time";
+            this.columnHeader2.Width = 167;
+            // 
             // label1
             // 
-            this.label1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(78, 0);
+            this.label1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.label1.Location = new System.Drawing.Point(0, 0);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(47, 13);
+            this.label1.Size = new System.Drawing.Size(270, 15);
             this.label1.TabIndex = 11;
             this.label1.Text = "TSheets";
             this.label1.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // label3
             // 
-            this.label3.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.label3.AutoSize = true;
-            this.label3.Location = new System.Drawing.Point(149, 0);
+            this.label3.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.label3.Location = new System.Drawing.Point(0, 0);
             this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(86, 13);
+            this.label3.Size = new System.Drawing.Size(314, 15);
             this.label3.TabIndex = 12;
             this.label3.Text = "Google Calendar";
             this.label3.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
-            // columnHeader1
-            // 
-            this.columnHeader1.Text = "User";
-            this.columnHeader1.Width = 71;
-            // 
-            // columnHeader2
-            // 
-            this.columnHeader2.Text = "Time";
-            this.columnHeader2.Width = 127;
-            // 
-            // columnHeader3
-            // 
-            this.columnHeader3.Text = "Job";
-            this.columnHeader3.Width = 93;
             // 
             // splitContainer1
             // 
@@ -267,7 +260,7 @@
             // splitContainer1.Panel2
             // 
             this.splitContainer1.Panel2.Controls.Add(this.splitContainer3);
-            this.splitContainer1.Size = new System.Drawing.Size(588, 357);
+            this.splitContainer1.Size = new System.Drawing.Size(588, 338);
             this.splitContainer1.SplitterDistance = 270;
             this.splitContainer1.TabIndex = 13;
             // 
@@ -284,14 +277,15 @@
             // 
             this.splitContainer2.Panel1.Controls.Add(this.label1);
             this.splitContainer2.Panel1.RightToLeft = System.Windows.Forms.RightToLeft.No;
+            this.splitContainer2.Panel1MinSize = 5;
             // 
             // splitContainer2.Panel2
             // 
             this.splitContainer2.Panel2.Controls.Add(this.TSheetsEventsList);
             this.splitContainer2.Panel2.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.splitContainer2.RightToLeft = System.Windows.Forms.RightToLeft.No;
-            this.splitContainer2.Size = new System.Drawing.Size(270, 357);
-            this.splitContainer2.SplitterDistance = 25;
+            this.splitContainer2.Size = new System.Drawing.Size(270, 338);
+            this.splitContainer2.SplitterDistance = 15;
             this.splitContainer2.TabIndex = 0;
             // 
             // splitContainer3
@@ -306,12 +300,13 @@
             // splitContainer3.Panel1
             // 
             this.splitContainer3.Panel1.Controls.Add(this.label3);
+            this.splitContainer3.Panel1MinSize = 5;
             // 
             // splitContainer3.Panel2
             // 
             this.splitContainer3.Panel2.Controls.Add(this.GoogleEventsList);
-            this.splitContainer3.Size = new System.Drawing.Size(314, 357);
-            this.splitContainer3.SplitterDistance = 25;
+            this.splitContainer3.Size = new System.Drawing.Size(314, 338);
+            this.splitContainer3.SplitterDistance = 15;
             this.splitContainer3.TabIndex = 0;
             // 
             // splitContainer4
@@ -344,6 +339,10 @@
             // 
             // splitContainer5.Panel1
             // 
+            this.splitContainer5.Panel1.Controls.Add(this.lblCalendar);
+            this.splitContainer5.Panel1.Controls.Add(this.label5);
+            this.splitContainer5.Panel1.Controls.Add(this.btnRefresh);
+            this.splitContainer5.Panel1.Controls.Add(this.btnSync);
             this.splitContainer5.Panel1.Controls.Add(this.lblURL);
             this.splitContainer5.Panel1.Controls.Add(this.label2);
             this.splitContainer5.Panel1.Controls.Add(this.lblEmail);
@@ -355,8 +354,19 @@
             // 
             this.splitContainer5.Panel2.Controls.Add(this.splitContainer1);
             this.splitContainer5.Size = new System.Drawing.Size(588, 426);
-            this.splitContainer5.SplitterDistance = 65;
+            this.splitContainer5.SplitterDistance = 84;
             this.splitContainer5.TabIndex = 0;
+            // 
+            // btnSync
+            // 
+            this.btnSync.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnSync.Location = new System.Drawing.Point(501, 3);
+            this.btnSync.Name = "btnSync";
+            this.btnSync.Size = new System.Drawing.Size(75, 23);
+            this.btnSync.TabIndex = 11;
+            this.btnSync.Text = "Sync";
+            this.btnSync.UseVisualStyleBackColor = true;
+            this.btnSync.Click += new System.EventHandler(this.btnSync_Click);
             // 
             // lblURL
             // 
@@ -366,6 +376,35 @@
             this.lblURL.Size = new System.Drawing.Size(0, 13);
             this.lblURL.TabIndex = 10;
             this.lblURL.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.lblURL_LinkClicked);
+            // 
+            // btnRefresh
+            // 
+            this.btnRefresh.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnRefresh.Location = new System.Drawing.Point(420, 3);
+            this.btnRefresh.Name = "btnRefresh";
+            this.btnRefresh.Size = new System.Drawing.Size(75, 23);
+            this.btnRefresh.TabIndex = 13;
+            this.btnRefresh.Text = "Refresh";
+            this.btnRefresh.UseVisualStyleBackColor = true;
+            this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
+            // 
+            // label5
+            // 
+            this.label5.AutoSize = true;
+            this.label5.Location = new System.Drawing.Point(20, 71);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(49, 13);
+            this.label5.TabIndex = 14;
+            this.label5.Text = "Calendar";
+            // 
+            // lblCalendar
+            // 
+            this.lblCalendar.AutoSize = true;
+            this.lblCalendar.Location = new System.Drawing.Point(75, 71);
+            this.lblCalendar.Name = "lblCalendar";
+            this.lblCalendar.Size = new System.Drawing.Size(0, 13);
+            this.lblCalendar.TabIndex = 15;
+            this.lblCalendar.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.lblCalendar_LinkClicked);
             // 
             // Form1
             // 
@@ -384,12 +423,10 @@
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();
             this.splitContainer1.ResumeLayout(false);
             this.splitContainer2.Panel1.ResumeLayout(false);
-            this.splitContainer2.Panel1.PerformLayout();
             this.splitContainer2.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).EndInit();
             this.splitContainer2.ResumeLayout(false);
             this.splitContainer3.Panel1.ResumeLayout(false);
-            this.splitContainer3.Panel1.PerformLayout();
             this.splitContainer3.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer3)).EndInit();
             this.splitContainer3.ResumeLayout(false);
@@ -411,7 +448,7 @@
 
         private System.Windows.Forms.ListView GoogleEventsList;
         private System.Windows.Forms.ColumnHeader Description;
-        private System.Windows.Forms.ColumnHeader When;
+        private System.Windows.Forms.ColumnHeader Time;
         private System.Windows.Forms.Button btnNewUser;
         private System.Windows.Forms.ListView UserListView;
         private System.Windows.Forms.Label label6;
@@ -428,13 +465,16 @@
         private System.Windows.Forms.ListView TSheetsEventsList;
         private System.Windows.Forms.ColumnHeader columnHeader1;
         private System.Windows.Forms.ColumnHeader columnHeader2;
-        private System.Windows.Forms.ColumnHeader columnHeader3;
         private System.Windows.Forms.SplitContainer splitContainer1;
         private System.Windows.Forms.SplitContainer splitContainer2;
         private System.Windows.Forms.SplitContainer splitContainer3;
         private System.Windows.Forms.SplitContainer splitContainer4;
         private System.Windows.Forms.SplitContainer splitContainer5;
         private System.Windows.Forms.LinkLabel lblURL;
+        private System.Windows.Forms.Button btnSync;
+        private System.Windows.Forms.Button btnRefresh;
+        private System.Windows.Forms.Label label5;
+        private System.Windows.Forms.LinkLabel lblCalendar;
     }
 }
 

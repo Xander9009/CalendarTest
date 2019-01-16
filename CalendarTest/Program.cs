@@ -29,7 +29,7 @@ namespace CalendarTest
 
         // If modifying these scopes, delete your previously saved credentials
         // at ~/.credentials/calendar-dotnet-quickstart.json
-        static string[] Scopes = { CalendarService.Scope.CalendarEvents };
+        static string[] Scopes = { CalendarService.Scope.CalendarReadonly, CalendarService.Scope.CalendarEvents };
         static string ApplicationName = "Google Calendar API .NET Quickstart";
         
         //Other variables
@@ -79,17 +79,53 @@ namespace CalendarTest
             Application.Run(form);
         }
 
+        internal static void Sync(User user)
+        {
+            List<Event> TSheetsEvents = TSheetsListTimesheets(user);
+            List<Event> GoogleCalendarEvents = GoogleCalendarListEvents(user);
+            bool EventsAdded = false;
+            foreach (var t in TSheetsEvents)
+            {
+                bool Found = false;
+                foreach (var g in GoogleCalendarEvents)
+                {
+                    if (g.Start.Equals(t.Start) && g.End.Equals(t.End) && g.Job == t.Job + " (TS)")
+                    {
+                        Found = true;
+                        break;
+                    }
+                }
+                if (!Found)
+                {
+                    EventsResource.InsertRequest request = new EventsResource.InsertRequest(
+                        user.GoogleService,
+                        new Google.Apis.Calendar.v3.Data.Event()
+                        {
+                            Summary = t.Job + " (TS)",
+                            Start = new EventDateTime() { DateTime = t.Start },
+                            End = new EventDateTime() { DateTime = t.End },
+                            Source = new Google.Apis.Calendar.v3.Data.Event.SourceData() {Title = "TSheets", Url = user.URL}
+                        },
+                        user.Calendar
+                    );
+                    request.Execute();
+                    EventsAdded = true;
+                }
+            }
+            if (EventsAdded) GoogleCalendarListUpcomingEvents(user);
+        }
+
         //Google Calendar methods
         static public void NewEvent(User user)
         {
             EventsResource.InsertRequest request = new EventsResource.InsertRequest(user.GoogleService,
-                new Event()
+                new Google.Apis.Calendar.v3.Data.Event()
                 {
                     Description = "New test event",
                     Start = new EventDateTime() { DateTime = new DateTime(2019, 1, 9, 5, 0, 0) },
                     End = new EventDateTime() { DateTime = new DateTime(2019, 1, 10, 5, 0, 0) }
                 },
-                "primary"
+                user.Calendar
                 );
             request.Execute();
         }
@@ -448,56 +484,99 @@ namespace CalendarTest
         /// <summary>
         /// Lists the next 10 upcoming events from Google Calendar.
         /// </summary>
-        private static void GoogleCalendarListEvents(User user)
+        private static void GoogleCalendarListUpcomingEvents(User user)
         {
-            //Example calendar event request. First, we need to get a list of events to see which TSheets events have been mirrored already.
-            // Define parameters of request.
+            try
+            {
+                // Define parameters of request.
+                EventsResource.ListRequest request = user.GoogleService.Events.List(user.Calendar);
+                request.TimeMin = DateTime.Now.AddDays(-7);
+                request.TimeMax = DateTime.Now.AddDays(14);
+                request.ShowDeleted = false;
+                request.SingleEvents = true;
+                request.OrderBy = EventsResource.ListRequest.OrderByEnum.StartTime;
+
+                // List events. Place event details in the listview.
+                Events events = request.Execute();
+
+                var eventsListView = (ListView)form.Controls.Find("GoogleEventsList", true)[0];
+                eventsListView.Items.Clear();
+                if (events.Items != null && events.Items.Count > 0)
+                {
+                    foreach (var eventItem in events.Items)
+                    {
+                        try
+                        {
+                            string when = eventItem.Start.DateTime.ToString();
+                            if (when != "")
+                            {
+                                when = when.Substring(0, when.Length - 6) + " " + when.Substring(when.Length - 2, 2);
+                            }
+                            if (when == "")
+                            {
+                                when = eventItem.Start.Date.ToString();
+                            }
+                            try
+                            {
+                                var Hour = eventItem.End.DateTime.Value.Hour;
+                                var Minute = eventItem.End.DateTime.Value.Minute;
+                                var Period = "AM";
+                                if (Hour > 12)
+                                {
+                                    Hour -= 12;
+                                    Period = "PM";
+                                }
+                                when += string.Format("-{0}:{1:00} {2}", Hour, Minute, Period);
+                            }
+                            catch { }
+                            var eventListViewItem = new ListViewItem(eventItem.Summary);
+                            eventListViewItem.SubItems.Add(when);
+                            eventsListView.Items.Add(eventListViewItem);
+                        }
+                        catch { }
+                    }
+                }
+                else
+                {
+                    var eventListViewItem = new ListViewItem(new string[] { "No upcoming events found", "" });
+                    eventsListView.Items.Add(eventListViewItem);
+                }
+            } catch { }
+        }
+
+        public static int CountPrimaryGoogleCalendarTSheetsEvents(User user)
+        {
+            try
+            {
+                // Define parameters of request.
+                EventsResource.ListRequest request = user.GoogleService.Events.List("primary");
+                request.ShowDeleted = false;
+                request.SingleEvents = true;
+                request.Q = "(TS)";
+                request.OrderBy = EventsResource.ListRequest.OrderByEnum.StartTime;
+
+                // List events. Place event details in the listview.
+                Events events = request.Execute();
+                return events.Items.Count;
+            }
+            catch { }
+            return 0;
+        }
+
+        public static void MigrateCalendarEvents(User user)
+        {
             EventsResource.ListRequest request = user.GoogleService.Events.List("primary");
-            request.TimeMin = DateTime.Now;
             request.ShowDeleted = false;
             request.SingleEvents = true;
-            request.MaxResults = 10;
+            request.Q = "(TS)";
             request.OrderBy = EventsResource.ListRequest.OrderByEnum.StartTime;
 
             // List events. Place event details in the listview.
             Events events = request.Execute();
-
-            var eventsListView = (ListView)form.Controls.Find("GoogleEventsList", true)[0];
-            eventsListView.Items.Clear();
-            if (events.Items != null && events.Items.Count > 0)
+            foreach (var eventItem in events.Items)
             {
-                foreach (var eventItem in events.Items)
-                {
-                    string when = eventItem.Start.DateTime.ToString();
-                    if (when != "")
-                    {
-                        when = when.Substring(0, when.Length - 6) + " " + when.Substring(when.Length - 2, 2);
-                    }
-                    if (when == "")
-                    {
-                        when = eventItem.Start.Date.ToString();
-                    }
-                    try
-                    {
-                        var Hour = eventItem.End.DateTime.Value.Hour;
-                        var Minute = eventItem.End.DateTime.Value.Minute;
-                        var Period = "AM";
-                        if (Hour > 12)
-                        {
-                            Hour -= 12;
-                            Period = "PM";
-                        }
-                        when += string.Format("-{0}:{1:00} {2}", Hour, Minute, Period);
-                    } catch { }
-                    var eventListViewItem = new ListViewItem(eventItem.Summary);
-                    eventListViewItem.SubItems.Add(when);
-                    eventsListView.Items.Add(eventListViewItem);
-                }
-            }
-            else
-            {
-                var eventListViewItem = new ListViewItem(new string[] { "No upcoming events found", "" });
-                eventsListView.Items.Add(eventListViewItem);
+                EventsResource.MoveRequest moveRequest = new EventsResource.MoveRequest(user.GoogleService, "primary", eventItem.Id, user.Calendar);
+                moveRequest.Execute();
             }
         }
 
@@ -524,14 +603,26 @@ namespace CalendarTest
 
         internal static void LoadUser(User user)
         {
-            
             GoogleAuthenticate(user);
             TSheetsAuthenticate(user);
+
+            if (user.Calendar == "primary")
+            {
+                GoogleCalendarFindTSCalendar(user, out user.Calendar, out user.CalendarName);
+                if (user.Calendar != "primary" && CountPrimaryGoogleCalendarTSheetsEvents(user) != 0)
+                {
+                    DialogResult dialogResult = MessageBox.Show("A Google Calendar specifically for TSheets has been found. Would you like to migrate all TSheets events from your primary calendar to the new calendar?", "Delete events?", MessageBoxButtons.YesNo);
+                    if (dialogResult == DialogResult.Yes)
+                    {
+                        MigrateCalendarEvents(user);
+                    }
+                }
+            }
 
             LoadUserLabelInfo(user);
 
             //Google Calendar samples
-            GoogleCalendarListEvents(user);
+            GoogleCalendarListUpcomingEvents(user);
 
             //TSheets samples
             TSheetsListTimesheets(user);
@@ -557,12 +648,12 @@ namespace CalendarTest
 
             form.Controls.Find("lblCurrentUser", true)[0].Text = string.Format("{0} {1}", userObject["first_name"], userObject["last_name"]);
             form.Controls.Find("lblEmail", true)[0].Text = userObject["email"].ToString();
-            form.Controls.Find("lblURL", true)[0].Text = userObject["client_url"].ToString() + ".tsheets.com";
-            LinkLabel L = form.Controls.Find("lblURL", true)[0] as LinkLabel;
-            L.LinkArea = new LinkArea(0, L.Text.Length);
+            user.URL = "https://" + userObject["client_url"].ToString() + ".tsheets.com";
+            form.Controls.Find("lblURL", true)[0].Text = user.URL;
+            form.Controls.Find("lblCalendar", true)[0].Text = user.CalendarName;
         }
 
-        private static void TSheetsListTimesheets(User user)
+        private static List<Event> TSheetsListTimesheets(User user)
         {
             ListView TSheetsEventList = form.Controls.Find("TSheetsEventsList", true)[0] as ListView;
             TSheetsEventList.Items.Clear();
@@ -570,24 +661,69 @@ namespace CalendarTest
             var tsheetsApi = new RestClient(user.TSheetsConnection, user.TSheetsAuthProvider);
 
             var filters = new Dictionary<string, string>();
-            filters.Add("start_date", "2019-1-12");
-            filters.Add("end_date", "2019-2-1");
+            var N = DateTime.Now.AddDays(-7);
+            filters.Add("start_date", string.Format("{0}-{1}-{2}", N.Year, N.Month, N.Day));
+            N = DateTime.Now.AddDays(14);
+            filters.Add("end_date", string.Format("{0}-{1}-{2}", N.Year, N.Month, N.Day));
             var timesheetData = tsheetsApi.Get(ObjectType.Timesheets, filters);
             var timesheetsObject = JObject.Parse(timesheetData);
             var allTimeSheets = timesheetsObject.SelectTokens("results.timesheets.*");
 
             var jobcodesData = tsheetsApi.Get(ObjectType.Jobcodes);
             var jobcodesObject = JObject.Parse(jobcodesData)["results"]["jobcodes"];
-            
+
+            var Events = new List<Event>();
+
             foreach (var timesheet in allTimeSheets)
             {
                 var tsUser = timesheetsObject.SelectToken("supplemental_data.users." + timesheet["user_id"]);
 
-                var eventListViewItem = new ListViewItem(string.Format("{0} {1}", tsUser["first_name"], tsUser["last_name"]));
+                var eventListViewItem = new ListViewItem(string.Format("{0}", jobcodesObject[timesheet["jobcode_id"].ToString()]["name"]));
                 eventListViewItem.SubItems.Add(string.Format("{0:g}-{1:t}", timesheet["start"], timesheet["end"]));
-                eventListViewItem.SubItems.Add(string.Format("{0}", jobcodesObject[timesheet["jobcode_id"].ToString()]["name"]));
                 TSheetsEventList.Items.Add(eventListViewItem);
+
+                Event E = new Event();
+                E.Type = Event.EventType.TSheets;
+                E.Start = (DateTime)timesheet["start"];
+                E.End = (DateTime)timesheet["end"];
+                E.Job = (string)jobcodesObject[timesheet["jobcode_id"].ToString()]["name"];
+                E.TSheetsID = (string)timesheet["id"];
+                E.URL = user.URL;
+                Events.Add(E);
             }
+            return Events;
+        }
+
+        private static List<Event> GoogleCalendarListEvents(User user)
+        {
+            List<Event> Events = new List<Event>();
+
+            EventsResource.ListRequest request = user.GoogleService.Events.List(user.Calendar);
+            request.TimeMin = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day - 7);
+            request.TimeMax = request.TimeMin.Value.AddDays(21);
+            request.ShowDeleted = false;
+            request.SingleEvents = true;
+            request.OrderBy = EventsResource.ListRequest.OrderByEnum.StartTime;
+
+            Events GCEvents = request.Execute();
+
+            if (GCEvents.Items != null && GCEvents.Items.Count > 0)
+            {
+                foreach (var eventItem in GCEvents.Items)
+                {
+                    try
+                    {
+                        Event E = new Event();
+                        E.Type = Event.EventType.GoogleCalendar;
+                        E.Start = (DateTime)eventItem.Start.DateTime;
+                        E.End = (DateTime)eventItem.End.DateTime;
+                        E.Job = (string)eventItem.Summary;
+                        E.GoogleCalendarID = (string)eventItem.Id;
+                        Events.Add(E);
+                    } catch { }
+                }
+            }
+            return Events;
         }
 
         internal static void NewUser()
@@ -658,12 +794,37 @@ namespace CalendarTest
                 AuthenticateWithBrowser(user);
             }
         }
+
+        static public void GoogleCalendarFindTSCalendar(User user, out string calendar, out string calendarName)
+        {
+            string Calendar = "primary";
+            string CalendarName = "Primary";
+
+            var request = new CalendarListResource.ListRequest(user.GoogleService);
+            var response = request.Execute();
+            foreach (var cal in response.Items)
+            {
+                if (cal.Summary.ToLower() == "ts" || cal.Summary.ToLower() == "tsheets")
+                {
+                    Calendar = cal.Id;
+                    CalendarName = cal.Summary;
+                    break;
+                }
+            }
+            calendar = Calendar;
+            calendarName = CalendarName;
+        }
     }
 
     internal class User
     {
         public string DisplayName;
         public int ID;
+        public string URL;
+        public string Calendar;
+        public string CalendarName;
+
+        public int testnum = 100;
 
         //Google Calendar variables
         public UserCredential GoogleCredential;
@@ -692,6 +853,7 @@ namespace CalendarTest
         {
             Program.GoogleAuthenticate(user);
             Program.TSheetsAuthenticate(user);
+            Program.GoogleCalendarFindTSCalendar(user, out user.Calendar, out user.CalendarName);
         }
 
         public SavableUserData GetSavableData()
@@ -699,6 +861,9 @@ namespace CalendarTest
             var SavableData = new SavableUserData();
             SavableData.ID = ID;
             SavableData.DisplayName = DisplayName;
+            SavableData.URL = URL;
+            SavableData.Calendar = Calendar;
+            SavableData.CalendarName = CalendarName;
             return SavableData;
         }
     }
@@ -707,6 +872,9 @@ namespace CalendarTest
     {
         public string DisplayName;
         public int ID;
+        public string URL;
+        public string Calendar;
+        public string CalendarName;
     }
 
     internal class TSheetsCredentials
@@ -715,6 +883,18 @@ namespace CalendarTest
         public string _redirectUri = "http://localhost";
         public string _clientSecret = "f91f618aca664c9487d6904ec3282dfd";
         public string _baseUri = "https://rest.tsheets.com/api/v1";
+    }
+
+    internal class Event
+    {
+        public enum EventType { GoogleCalendar, TSheets, Both };
+        public EventType Type;
+        public DateTime Start;
+        public DateTime End;
+        public string Job;
+        public string GoogleCalendarID;
+        public string TSheetsID;
+        public string URL;
     }
 
     public static class Prompt

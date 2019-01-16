@@ -53,7 +53,22 @@ namespace CalendarTest
 
         private void lblURL_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
-            System.Diagnostics.Process.Start("http://" + (sender as Control).Text);
+            System.Diagnostics.Process.Start((sender as Control).Text);
+        }
+
+        private void btnSync_Click(object sender, EventArgs e)
+        {
+            Program.Sync(Program.CurrentUser);
+        }
+
+        private void btnRefresh_Click(object sender, EventArgs e)
+        {
+            Program.LoadUser();
+        }
+
+        private void lblCalendar_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            System.Diagnostics.Process.Start("https://calendar.google.com/calendar/embed?src=" + Program.CurrentUser.Calendar);
         }
     }
 }
