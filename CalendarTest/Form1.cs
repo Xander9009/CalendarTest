@@ -29,7 +29,6 @@ namespace CalendarTest
     {
         private static List<User> Users = new List<User>();
         private static List<SavableUserData> SavableUsers = new List<SavableUserData>();
-        private static Form1 form;
         public static User CurrentUser;
 
         public Form1()
@@ -45,7 +44,6 @@ namespace CalendarTest
                     SavableUsers = (List<SavableUserData>)serializer.Deserialize(file, typeof(List<SavableUserData>));
                     if (SavableUsers.Count > 0)
                     {
-                        ListView UserListView = form.Controls.Find("UserListView", true)[0] as ListView;
                         UserListView.Items.Clear();
                         foreach (SavableUserData user in SavableUsers)
                         {
@@ -62,6 +60,21 @@ namespace CalendarTest
         private void btnNewUser_Click(object sender, EventArgs e)
         {
             NewUser();
+        }
+
+        private void btnRefresh_Click(object sender, EventArgs e)
+        {
+            LoadUser();
+        }
+
+        private void btnSync_Click(object sender, EventArgs e)
+        {
+            Sync(CurrentUser);
+        }
+
+        private void btnCreateTimesheet_Click(object sender, EventArgs e)
+        {
+
         }
 
         private bool maxedWhenTrayed = false;
@@ -97,16 +110,6 @@ namespace CalendarTest
             System.Diagnostics.Process.Start((sender as Control).Text);
         }
 
-        private void btnSync_Click(object sender, EventArgs e)
-        {
-            Sync(CurrentUser);
-        }
-
-        private void btnRefresh_Click(object sender, EventArgs e)
-        {
-            LoadUser();
-        }
-
         private void lblCalendar_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
             System.Diagnostics.Process.Start("https://calendar.google.com/calendar/embed?src=" + CurrentUser.Calendar);
@@ -114,10 +117,10 @@ namespace CalendarTest
 
         internal void Sync(User user)
         {
-            List<Event> TSheetsEvents = TSheetsListTimesheets(user);
+            List<Event> TSheetsScheduleEvents = TSheetsListScheduleEvents(user);
             List<Event> GoogleCalendarEvents = GoogleCalendarListEvents(user);
             bool EventsAdded = false;
-            foreach (var t in TSheetsEvents)
+            foreach (var t in TSheetsScheduleEvents)
             {
                 bool Found = false;
                 foreach (var g in GoogleCalendarEvents)
@@ -263,8 +266,7 @@ namespace CalendarTest
                 // List events. Place event details in the listview.
                 Events events = request.Execute();
 
-                var eventsListView = (ListView)form.Controls.Find("GoogleEventsList", true)[0];
-                eventsListView.Items.Clear();
+                GoogleEventsList.Items.Clear();
                 if (events.Items != null && events.Items.Count > 0)
                 {
                     foreach (var eventItem in events.Items)
@@ -295,7 +297,7 @@ namespace CalendarTest
                             catch { }
                             var eventListViewItem = new ListViewItem(eventItem.Summary);
                             eventListViewItem.SubItems.Add(when);
-                            eventsListView.Items.Add(eventListViewItem);
+                            GoogleEventsList.Items.Add(eventListViewItem);
                         }
                         catch { }
                     }
@@ -303,7 +305,7 @@ namespace CalendarTest
                 else
                 {
                     var eventListViewItem = new ListViewItem(new string[] { "No upcoming events found", "" });
-                    eventsListView.Items.Add(eventListViewItem);
+                    GoogleEventsList.Items.Add(eventListViewItem);
                 }
             }
             catch { }
@@ -347,7 +349,6 @@ namespace CalendarTest
 
         internal void LoadUser()
         {
-            ListView UserListView = form.Controls.Find("UserListView", true)[0] as ListView;
             if (UserListView.SelectedItems != null && UserListView.SelectedItems.Count > 0)
             {
                 string DisplayName = UserListView.SelectedItems[0].Text;
@@ -386,62 +387,59 @@ namespace CalendarTest
 
             LoadUserLabelInfo(user);
 
-            //Google Calendar samples
             GoogleCalendarListUpcomingEvents(user);
-
-            //TSheets samples
-            TSheetsListTimesheets(user);
+            TSheetsListScheduleEvents(user);
         }
 
-        private static void LoadUserLabelInfo(User user)
+        private void LoadUserLabelInfo(User user)
         {
             var tsheetsApi = new RestClient(user.TSheetsConnection, user.TSheetsAuthProvider);
             var userData = tsheetsApi.Get(ObjectType.CurrentUser);
             var responseObject = JObject.Parse(userData);
             var userObject = responseObject.SelectToken("results.users.*");
 
-            form.Controls.Find("lblCurrentUser", true)[0].Text = string.Format("{0} {1}", userObject["first_name"], userObject["last_name"]);
-            form.Controls.Find("lblEmail", true)[0].Text = userObject["email"].ToString();
+            lblCurrentUser.Text = string.Format("{0} {1}", userObject["first_name"], userObject["last_name"]);
+            lblEmail.Text = userObject["email"].ToString();
             user.URL = "https://" + userObject["client_url"].ToString() + ".tsheets.com";
-            form.Controls.Find("lblURL", true)[0].Text = user.URL;
-            form.Controls.Find("lblCalendar", true)[0].Text = user.CalendarName;
+            lblURL.Text = user.URL;
+            lblCalendar.Text = user.CalendarName;
         }
 
-        private static List<Event> TSheetsListTimesheets(User user)
+        private List<Event> TSheetsListScheduleEvents(User user)
         {
-            ListView TSheetsEventList = form.Controls.Find("TSheetsEventsList", true)[0] as ListView;
-            TSheetsEventList.Items.Clear();
+            TSheetsEventsList.Items.Clear();
 
             var tsheetsApi = new RestClient(user.TSheetsConnection, user.TSheetsAuthProvider);
 
             var filters = new Dictionary<string, string>();
             var N = DateTime.Now.AddDays(-7);
-            filters.Add("start_date", string.Format("{0}-{1}-{2}", N.Year, N.Month, N.Day));
+            filters.Add("start", N.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'") + "00+00:00");
             N = DateTime.Now.AddDays(14);
-            filters.Add("end_date", string.Format("{0}-{1}-{2}", N.Year, N.Month, N.Day));
-            var timesheetData = tsheetsApi.Get(ObjectType.Timesheets, filters);
-            var timesheetsObject = JObject.Parse(timesheetData);
-            var allTimeSheets = timesheetsObject.SelectTokens("results.timesheets.*");
+            filters.Add("end", N.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'") + "00+00:00");
+            filters.Add("schedule_calendar_ids", "173108");
+            var ScheduleData = tsheetsApi.Get(ObjectType.ScheduleEvents, filters);
+            var ScheduleEventsObject = JObject.Parse(ScheduleData);
+            var allScheduleEvents = ScheduleEventsObject.SelectTokens("results.timesheets.*");
 
             var jobcodesData = tsheetsApi.Get(ObjectType.Jobcodes);
             var jobcodesObject = JObject.Parse(jobcodesData)["results"]["jobcodes"];
 
             var Events = new List<Event>();
 
-            foreach (var timesheet in allTimeSheets)
+            foreach (var ScheduleEvent in allScheduleEvents)
             {
-                var tsUser = timesheetsObject.SelectToken("supplemental_data.users." + timesheet["user_id"]);
+                var tsUser = ScheduleEvent.SelectToken("supplemental_data.users." + ScheduleEvent["user_id"]);
 
-                var eventListViewItem = new ListViewItem(string.Format("{0}", jobcodesObject[timesheet["jobcode_id"].ToString()]["name"]));
-                eventListViewItem.SubItems.Add(string.Format("{0:g}-{1:t}", timesheet["start"], timesheet["end"]));
-                TSheetsEventList.Items.Add(eventListViewItem);
+                var eventListViewItem = new ListViewItem(string.Format("{0}", jobcodesObject[ScheduleEvent["jobcode_id"].ToString()]["name"]));
+                eventListViewItem.SubItems.Add(string.Format("{0:g}-{1:t}", ScheduleEvent["start"], ScheduleEvent["end"]));
+                TSheetsEventsList.Items.Add(eventListViewItem);
 
                 Event E = new Event();
                 E.Type = Event.EventType.TSheets;
-                E.Start = (DateTime)timesheet["start"];
-                E.End = (DateTime)timesheet["end"];
-                E.Job = (string)jobcodesObject[timesheet["jobcode_id"].ToString()]["name"];
-                E.TSheetsID = (string)timesheet["id"];
+                E.Start = (DateTime)ScheduleEvent["start"];
+                E.End = (DateTime)ScheduleEvent["end"];
+                E.Job = (string)jobcodesObject[ScheduleEvent["jobcode_id"].ToString()]["name"];
+                E.TSheetsID = (string)ScheduleEvent["id"];
                 E.URL = user.URL;
                 Events.Add(E);
             }
@@ -496,7 +494,6 @@ namespace CalendarTest
                 }
                 LoadUser(user);
 
-                ListView UserListView = form.Controls.Find("UserListView", true)[0] as ListView;
                 UserListView.Items.Add(user.DisplayName);
                 UserListView.Items[UserListView.Items.Count - 1].Selected = true;
             }

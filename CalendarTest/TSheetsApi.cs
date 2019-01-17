@@ -338,28 +338,48 @@ namespace TSheets
         {
             switch (objectType)
             {
-                case ObjectType.Users:
-                    return "users";
                 case ObjectType.CurrentUser:
                     return "current_user";
                 case ObjectType.EffectiveSettings:
                     return "effective_settings";
-                case ObjectType.Jobcodes:
-                    return "jobcodes";
-                case ObjectType.JobcodeAssignments:
-                    return "jobcode_assignments";
                 case ObjectType.CustomFields:
                     return "customfields";
                 case ObjectType.CustomFieldItems:
                     return "customfielditems";
+                case ObjectType.Files:
+                    return "files";
+                case ObjectType.GeofenceConfigs:
+                    return "geofence_configs";
+                case ObjectType.Geolocations:
+                    return "geolocations";
+                case ObjectType.Groups:
+                    return "groups";
+                case ObjectType.Jobcodes:
+                    return "jobcodes";
+                case ObjectType.JobcodeAssignments:
+                    return "jobcode_assignments";
+                case ObjectType.LastModified:
+                    return "last_modified_timestamps";
+                case ObjectType.Locations:
+                    return "locations";
+                case ObjectType.LocationsMaps:
+                    return "locations_map";
+                case ObjectType.ManagedClients:
+                    return "managed_clients";
+                case ObjectType.Notifications:
+                    return "notifications";
+                case ObjectType.Reminders:
+                    return "reminders";
+                case ObjectType.ScheduleCalendars:
+                    return "schedule_calendars";
+                case ObjectType.ScheduleEvents:
+                    return "schedule_events";
                 case ObjectType.Timesheets:
                     return "timesheets";
                 case ObjectType.TimesheetsDeleted:
                     return "timesheets_deleted";
-                case ObjectType.Geolocations:
-                    return "geolocations";
-                case ObjectType.LastModified:
-                    return "last_modified_timestamps";
+                case ObjectType.Users:
+                    return "users";
                 default:
                     Debug.Assert(false, "Unknown ObjectType: " + objectType);
                     throw new NotImplementedException("Unknown endpoint for ObjectType: " + objectType);
@@ -415,17 +435,27 @@ namespace TSheets
     /// </summary>
     public enum ObjectType
     {
-        Users,
         CurrentUser,
-        EffectiveSettings,
-        Jobcodes,
-        JobcodeAssignments,
         CustomFields,
         CustomFieldItems,
+        EffectiveSettings,
+        Files,
+        GeofenceConfigs,
+        Geolocations,
+        Groups,
+        Jobcodes,
+        JobcodeAssignments,
+        LastModified,
+        Locations,
+        LocationsMaps,
+        ManagedClients,
+        Notifications,
+        Reminders,
         Timesheets,
         TimesheetsDeleted,
-        Geolocations,
-        LastModified,
+        ScheduleCalendars,
+        ScheduleEvents,
+        Users
     }
 
     /// <summary>
