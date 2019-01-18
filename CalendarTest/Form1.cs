@@ -74,7 +74,57 @@ namespace CalendarTest
 
         private void btnCreateTimesheet_Click(object sender, EventArgs e)
         {
+            //string StartDate = Prompt.ShowDialog("Please enter the first date of the timesheet in YYYY-MM-DD format.", "Timehseet start date.");
+            var StartDate = "2019-01-15";
+            if (StartDate.Length != 10) { MessageBox.Show("Date entered is invalid."); return; }
+            List<Event> TimesheetEvents = TSheetsListTimesheetEvents(CurrentUser, StartDate);
+            List<Event> MergedEvents = new List<Event>();
+            
+            Event LatestEvent = null;
+            foreach (var TimesheetEvent in TimesheetEvents)
+            {
+                if (LatestEvent != null)
+                {
+                    if (LatestEvent.End == TimesheetEvent.Start)
+                    {
+                        LatestEvent.End = TimesheetEvent.End;
+                    }
+                    else
+                    {
+                        if (LatestEvent != null)
+                        {
+                            MergedEvents.Add(LatestEvent);
+                        }
+                        LatestEvent = TimesheetEvent;
+                    }
+                }
+                else
+                {
+                    LatestEvent = TimesheetEvent;
+                }
+            }
+            if (LatestEvent != null)
+            {
+                MergedEvents.Add(LatestEvent);
+            }
 
+
+            var getRequest = CurrentUser.GoogleSheetsService.Spreadsheets.Get("1X34Qr-hxoTk8YJco9uapjRSX8g-tcaZW_kWpkNINdSg");
+            getRequest.Ranges = "A1:Z50";
+            getRequest.IncludeGridData = true;
+            var Template = getRequest.Execute();
+
+            Template.Sheets[0].Data[0].RowData[2].Values[3].EffectiveValue = new ExtendedValue { StringValue = "Test" };
+            
+            //var TemplateSheetID = Template.Sheets[0].Properties.SheetId;
+            //var NewSpreadsheet = CurrentUser.GoogleSheetsService.Spreadsheets.Sheets.CopyTo(CopySheetToAnotherSpreadsheetRequest(), , TemplateSheetID);
+
+            SpreadsheetsResource.CreateRequest request = new SpreadsheetsResource.CreateRequest(
+                CurrentUser.GoogleSheetsService,
+                Template
+                );
+            var NewSheet = request.Execute();
+            System.Diagnostics.Process.Start(NewSheet.SpreadsheetUrl);
         }
 
         private bool maxedWhenTrayed = false;
@@ -119,7 +169,7 @@ namespace CalendarTest
         {
             List<Event> TSheetsScheduleEvents = TSheetsListScheduleEvents(user);
             List<Event> GoogleCalendarEvents = GoogleCalendarListEvents(user);
-            bool EventsAdded = false;
+            bool EventsChanged = false;
             foreach (var t in TSheetsScheduleEvents)
             {
                 bool Found = false;
@@ -134,7 +184,7 @@ namespace CalendarTest
                 if (!Found)
                 {
                     EventsResource.InsertRequest request = new EventsResource.InsertRequest(
-                        user.GoogleService,
+                        user.GoogleCalendarService,
                         new Google.Apis.Calendar.v3.Data.Event()
                         {
                             Summary = t.Job + " (TS)",
@@ -145,19 +195,42 @@ namespace CalendarTest
                         user.Calendar
                     );
                     request.Execute();
-                    EventsAdded = true;
+                    EventsChanged = true;
                 }
             }
 
-            //Now compare backwards.
+            var tsheetsApi = new RestClient(user.TSheetsConnection, user.TSheetsAuthProvider);
+            foreach (var g in GoogleCalendarEvents)
+            {
+                bool Found = false;
+                foreach (var t in TSheetsScheduleEvents)
+                {
+                    if (t.Start.Equals(g.Start) && t.End.Equals(g.End) && g.Job == t.Job + " (TS)")
+                    {
+                        Found = true;
+                        break;
+                    }
+                }
+                if (!Found)
+                {
+                    EventsResource.DeleteRequest request = new EventsResource.DeleteRequest(
+                        user.GoogleCalendarService,
+                        user.Calendar,
+                        g.GoogleCalendarID
+                        );
+                    request.Execute();
+                    EventsChanged = true;
+                }
+            }
 
-            if (EventsAdded) GoogleCalendarListUpcomingEvents(user);
+            if (EventsChanged) GoogleCalendarListUpcomingEvents(user);
         }
 
         //Google Calendar methods
         public static void NewEvent(User user)
         {
-            EventsResource.InsertRequest request = new EventsResource.InsertRequest(user.GoogleService,
+            EventsResource.InsertRequest request = new EventsResource.InsertRequest(
+                user.GoogleCalendarService,
                 new Google.Apis.Calendar.v3.Data.Event()
                 {
                     Description = "New test event",
@@ -259,7 +332,7 @@ namespace CalendarTest
             try
             {
                 // Define parameters of request.
-                EventsResource.ListRequest request = user.GoogleService.Events.List(user.Calendar);
+                EventsResource.ListRequest request = user.GoogleCalendarService.Events.List(user.Calendar);
                 request.TimeMin = DateTime.Now.AddDays(-7);
                 request.TimeMax = DateTime.Now.AddDays(14);
                 request.ShowDeleted = false;
@@ -319,7 +392,7 @@ namespace CalendarTest
             try
             {
                 // Define parameters of request.
-                EventsResource.ListRequest request = user.GoogleService.Events.List("primary");
+                EventsResource.ListRequest request = user.GoogleCalendarService.Events.List("primary");
                 request.ShowDeleted = false;
                 request.SingleEvents = true;
                 request.Q = "(TS)";
@@ -335,7 +408,7 @@ namespace CalendarTest
 
         public static void MigrateCalendarEvents(User user)
         {
-            EventsResource.ListRequest request = user.GoogleService.Events.List("primary");
+            EventsResource.ListRequest request = user.GoogleCalendarService.Events.List("primary");
             request.ShowDeleted = false;
             request.SingleEvents = true;
             request.Q = "(TS)";
@@ -345,7 +418,7 @@ namespace CalendarTest
             Events events = request.Execute();
             foreach (var eventItem in events.Items)
             {
-                EventsResource.MoveRequest moveRequest = new EventsResource.MoveRequest(user.GoogleService, "primary", eventItem.Id, user.Calendar);
+                EventsResource.MoveRequest moveRequest = new EventsResource.MoveRequest(user.GoogleCalendarService, "primary", eventItem.Id, user.Calendar);
                 moveRequest.Execute();
             }
         }
@@ -439,15 +512,62 @@ namespace CalendarTest
                 eventListViewItem.SubItems.Add(string.Format("{0:g}-{1:t}", ScheduleEvent["start"], ScheduleEvent["end"]));
                 TSheetsEventsList.Items.Add(eventListViewItem);
 
-                Event E = new Event();
-                E.Type = Event.EventType.TSheets;
-                E.Start = (DateTime)ScheduleEvent["start"];
-                E.End = (DateTime)ScheduleEvent["end"];
-                E.Job = JobCode;
-                E.TSheetsID = (string)ScheduleEvent["id"];
-                E.URL = user.URL;
+                Event E = new Event
+                {
+                    Type = Event.EventType.TSheets,
+                    Start = (DateTime)ScheduleEvent["start"],
+                    End = (DateTime)ScheduleEvent["end"],
+                    Job = JobCode,
+                    TSheetsID = (string)ScheduleEvent["id"],
+                    URL = user.URL
+                };
                 Events.Add(E);
             }
+            return Events;
+        }
+
+        private List<Event> TSheetsListTimesheetEvents(User user, string StartDate)
+        {
+            TSheetsEventsList.Items.Clear();
+
+            var tsheetsApi = new RestClient(user.TSheetsConnection, user.TSheetsAuthProvider);
+
+            var filters = new Dictionary<string, string>();
+            var N = new DateTime(int.Parse(StartDate.Substring(0, 4)), int.Parse(StartDate.Substring(5, 2)), int.Parse(StartDate.Substring(8, 2)));
+            filters.Add("start_date", StartDate);
+            N = DateTime.Now.AddDays(14);
+            filters.Add("end_date", N.ToString("yyyy'-'MM'-'dd"));
+            var ScheduleData = tsheetsApi.Get(ObjectType.Timesheets, filters);
+            var ScheduleEventsObject = JObject.Parse(ScheduleData);
+            var allScheduleEvents = ScheduleEventsObject.SelectTokens("results.timesheets.*");
+
+            var jobcodesData = tsheetsApi.Get(ObjectType.Jobcodes);
+            var jobcodesObject = JObject.Parse(jobcodesData)["results"]["jobcodes"];
+
+            var Events = new List<Event>();
+
+            foreach (var TimesheetEvent in allScheduleEvents)
+            {
+                var tsUser = TimesheetEvent.SelectToken("supplemental_data.users." + TimesheetEvent["user_id"]);
+
+                var JobCode = TimesheetEvent["jobcode_id"].ToString();
+                JobCode = JobCode == "0" ? "Untitled" : jobcodesObject[JobCode]["name"].ToString();
+                var eventListViewItem = new ListViewItem(string.Format("{0}", JobCode));
+                eventListViewItem.SubItems.Add(string.Format("{0:g}-{1:t}", TimesheetEvent["start"], TimesheetEvent["end"]));
+                TSheetsEventsList.Items.Add(eventListViewItem);
+
+                Event E = new Event
+                {
+                    Type = Event.EventType.TSheets,
+                    Start = (DateTime)TimesheetEvent["start"],
+                    End = (DateTime)TimesheetEvent["end"],
+                    Job = JobCode,
+                    TSheetsID = (string)TimesheetEvent["id"],
+                    URL = user.URL
+                };
+                Events.Add(E);
+            }
+            //Events.Sort((x, y) => x.Start.CompareTo(y.Start));
             return Events;
         }
 
@@ -455,7 +575,7 @@ namespace CalendarTest
         {
             List<Event> Events = new List<Event>();
 
-            EventsResource.ListRequest request = user.GoogleService.Events.List(user.Calendar);
+            EventsResource.ListRequest request = user.GoogleCalendarService.Events.List(user.Calendar);
             request.TimeMin = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day - 7);
             request.TimeMax = request.TimeMin.Value.AddDays(21);
             request.ShowDeleted = false;
@@ -470,12 +590,14 @@ namespace CalendarTest
                 {
                     try
                     {
-                        Event E = new Event();
-                        E.Type = Event.EventType.GoogleCalendar;
-                        E.Start = (DateTime)eventItem.Start.DateTime;
-                        E.End = (DateTime)eventItem.End.DateTime;
-                        E.Job = (string)eventItem.Summary;
-                        E.GoogleCalendarID = (string)eventItem.Id;
+                        Event E = new Event
+                        {
+                            Type = Event.EventType.GoogleCalendar,
+                            Start = (DateTime)eventItem.Start.DateTime,
+                            End = (DateTime)eventItem.End.DateTime,
+                            Job = (string)eventItem.Summary,
+                            GoogleCalendarID = (string)eventItem.Id
+                        };
                         Events.Add(E);
                     }
                     catch { }
@@ -520,10 +642,19 @@ namespace CalendarTest
                     CancellationToken.None,
                     new FileDataStore(credPath, true)).Result;
                 Console.WriteLine("Credential file saved to: " + credPath);
+
+                
             }
 
             // Create Google Calendar API service.
-            user.GoogleService = new CalendarService(new BaseClientService.Initializer()
+            user.GoogleCalendarService = new CalendarService(new BaseClientService.Initializer()
+            {
+                HttpClientInitializer = user.GoogleCredential,
+                ApplicationName = Program.ApplicationName,
+            });
+
+            // Create Google Sheets API service.
+            user.GoogleSheetsService = new SheetsService(new BaseClientService.Initializer()
             {
                 HttpClientInitializer = user.GoogleCredential,
                 ApplicationName = Program.ApplicationName,
@@ -557,7 +688,7 @@ namespace CalendarTest
             string Calendar = "primary";
             string CalendarName = "Primary";
 
-            var request = new CalendarListResource.ListRequest(user.GoogleService);
+            var request = new CalendarListResource.ListRequest(user.GoogleCalendarService);
             var response = request.Execute();
             foreach (var cal in response.Items)
             {
@@ -584,7 +715,8 @@ namespace CalendarTest
 
             //Google Calendar variables
             public UserCredential GoogleCredential;
-            public CalendarService GoogleService;
+            public CalendarService GoogleCalendarService;
+            public SheetsService GoogleSheetsService;
 
             //TSheets variables
             public ConnectionInfo TSheetsConnection;
