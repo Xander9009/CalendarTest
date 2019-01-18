@@ -148,6 +148,9 @@ namespace CalendarTest
                     EventsAdded = true;
                 }
             }
+
+            //Now compare backwards.
+
             if (EventsAdded) GoogleCalendarListUpcomingEvents(user);
         }
 
@@ -419,7 +422,7 @@ namespace CalendarTest
             filters.Add("schedule_calendar_ids", "173108");
             var ScheduleData = tsheetsApi.Get(ObjectType.ScheduleEvents, filters);
             var ScheduleEventsObject = JObject.Parse(ScheduleData);
-            var allScheduleEvents = ScheduleEventsObject.SelectTokens("results.timesheets.*");
+            var allScheduleEvents = ScheduleEventsObject.SelectTokens("results.schedule_events.*");
 
             var jobcodesData = tsheetsApi.Get(ObjectType.Jobcodes);
             var jobcodesObject = JObject.Parse(jobcodesData)["results"]["jobcodes"];
@@ -430,7 +433,9 @@ namespace CalendarTest
             {
                 var tsUser = ScheduleEvent.SelectToken("supplemental_data.users." + ScheduleEvent["user_id"]);
 
-                var eventListViewItem = new ListViewItem(string.Format("{0}", jobcodesObject[ScheduleEvent["jobcode_id"].ToString()]["name"]));
+                var JobCode = ScheduleEvent["jobcode_id"].ToString();
+                JobCode = JobCode == "0" ? "Untitled" : jobcodesObject[JobCode]["name"].ToString();
+                var eventListViewItem = new ListViewItem(string.Format("{0}", JobCode));
                 eventListViewItem.SubItems.Add(string.Format("{0:g}-{1:t}", ScheduleEvent["start"], ScheduleEvent["end"]));
                 TSheetsEventsList.Items.Add(eventListViewItem);
 
@@ -438,7 +443,7 @@ namespace CalendarTest
                 E.Type = Event.EventType.TSheets;
                 E.Start = (DateTime)ScheduleEvent["start"];
                 E.End = (DateTime)ScheduleEvent["end"];
-                E.Job = (string)jobcodesObject[ScheduleEvent["jobcode_id"].ToString()]["name"];
+                E.Job = JobCode;
                 E.TSheetsID = (string)ScheduleEvent["id"];
                 E.URL = user.URL;
                 Events.Add(E);
