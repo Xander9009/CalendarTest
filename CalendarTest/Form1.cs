@@ -22,6 +22,7 @@ using Google.Apis.Sheets.v4;
 using Google.Apis.Sheets.v4.Data;
 
 using TSheets;
+using System.Text.RegularExpressions;
 
 namespace CalendarTest
 {
@@ -109,22 +110,104 @@ namespace CalendarTest
             }
 
 
-            var getRequest = CurrentUser.GoogleSheetsService.Spreadsheets.Get("1X34Qr-hxoTk8YJco9uapjRSX8g-tcaZW_kWpkNINdSg");
+            var getRequest = CurrentUser.GoogleSheetsService.Spreadsheets.Get("1uD1eclhcxHiWGj3raNbuLiTdI47cWoHV8AMJoikBx-8");
             getRequest.Ranges = "A1:Z50";
             getRequest.IncludeGridData = true;
             var Template = getRequest.Execute();
 
-            Template.Sheets[0].Data[0].RowData[2].Values[3].EffectiveValue = new ExtendedValue { StringValue = "Test" };
-            
-            //var TemplateSheetID = Template.Sheets[0].Properties.SheetId;
-            //var NewSpreadsheet = CurrentUser.GoogleSheetsService.Spreadsheets.Sheets.CopyTo(CopySheetToAnotherSpreadsheetRequest(), , TemplateSheetID);
+            Template.SpreadsheetId = null;
+            Template.SpreadsheetUrl = null;
 
             SpreadsheetsResource.CreateRequest request = new SpreadsheetsResource.CreateRequest(
                 CurrentUser.GoogleSheetsService,
                 Template
                 );
-            var NewSheet = request.Execute();
-            System.Diagnostics.Process.Start(NewSheet.SpreadsheetUrl);
+            var NewSpreadsheet = request.Execute();
+
+            var ID = NewSpreadsheet.SpreadsheetId;
+
+            var reqs = new BatchUpdateSpreadsheetRequest();
+            reqs.Requests = new List<Request>();
+
+            reqs.Requests.Add(UpdateCellValue("B2", new string[,] { { "Test" } }, Template));
+            
+            
+
+            
+            // Execute request
+            var response = CurrentUser.GoogleSheetsService.Spreadsheets.BatchUpdate(reqs, ID).Execute(); // Replace Spreadsheet.SpreadsheetId with your recently created spreadsheet ID
+
+            System.Diagnostics.Process.Start(NewSpreadsheet.SpreadsheetUrl);
+        }
+
+        private Request UpdateCellValue(string Range, string[,] Value, Spreadsheet Template)
+        {
+            // Create starting coordinate where data would be written to
+
+            var StartRow = RowFromCellString(Range);
+            var StartColumn = ColumnFromCellString(Range);
+            var EndRow = RowFromCellString(Range);
+            var EndColumn = ColumnFromCellString(Range);
+
+            GridCoordinate gridCoordinate = new GridCoordinate();
+            gridCoordinate.ColumnIndex = StartColumn;
+            gridCoordinate.RowIndex = StartRow;
+            gridCoordinate.SheetId = 542233618; // Your specific sheet ID here
+
+            var request = new Request();
+            request.UpdateCells = new UpdateCellsRequest();
+            request.UpdateCells.Start = gridCoordinate;
+            request.UpdateCells.Fields = "*"; // needed by API, throws error if null
+
+            foreach (var Row in Value)
+            {
+                RowData rowData = new RowData();
+                List<CellData> listCellData = new List<CellData>();
+
+                foreach (var Cell in Row)
+                {
+                    ExtendedValue extendedValue = new ExtendedValue();
+                    extendedValue.StringValue = Cell;
+
+                    CellData cellData = new CellData();
+                    cellData.UserEnteredValue = extendedValue;
+                    cellData.EffectiveFormat = Template.Sheets[0].Data[0].RowData[Row].Values[Column].EffectiveFormat;
+                    listCellData.Add(cellData);
+                }
+
+                // Assigning data to cells
+                
+                
+
+                rowData.Values = listCellData;
+
+                // Put cell data into a row
+                List<RowData> listRowData = new List<RowData>();
+                listRowData.Add(rowData);
+                request.UpdateCells.Rows = listRowData;
+            }
+            
+            return request;
+        }
+
+        private int ColumnFromCellString(string Cell)
+        {
+            Regex rx = new Regex(@"([a-z]+)[0-9]+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            var Column = rx.Match(Cell).Groups[1].Value;
+            Column = Column.ToUpperInvariant();
+            int sum = 0;
+            for (int i = 0; i < Column.Length; i++)
+            {
+                sum *= 26;
+                sum += (Column[i] - 'A' + 1);
+            }
+            return sum;
+        }
+
+        private int RowFromCellString(string Cell)
+        {
+            Regex rx = new Regex(@"[a-z]+([0-9]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            return int.Parse(rx.Match(Cell).Groups[1].Value);
         }
 
         private bool maxedWhenTrayed = false;
