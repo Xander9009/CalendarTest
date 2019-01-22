@@ -60,7 +60,49 @@ namespace CalendarTest
                     }
                 }
             }
-        }
+            foreach (var file in Directory.EnumerateFiles(Environment.CurrentDirectory, "*TSToken.json"))
+            {
+                Regex rx = new Regex(@"\\([0-9]+)TStoken.json");
+                var match = rx.Match(file);
+                if (match.Success)
+                {
+                    var found = false;
+                    foreach (User user in Users)
+                    {
+                        if (user.ID.ToString() == match.Groups[1].Value)
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found)
+                    {
+                        System.IO.File.Delete(file);
+                    }
+                }
+            }
+            foreach (var directory in Directory.EnumerateDirectories(Environment.CurrentDirectory, "*GCToken.json"))
+            {
+                Regex rx = new Regex(@"\\([0-9]+)GCtoken.json");
+                var match = rx.Match(directory);
+                if (match.Success)
+                {
+                    var found = false;
+                    foreach (User user in Users)
+                    {
+                        if (user.ID.ToString() == match.Groups[1].Value)
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found)
+                    {
+                        Directory.Delete(directory, true);
+                    }
+                }
+            }
+            }
 
         private void btnNewUser_Click(object sender, EventArgs e)
         {
