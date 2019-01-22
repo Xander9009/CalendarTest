@@ -35,6 +35,7 @@ namespace CalendarTest
         public Form1()
         {
             InitializeComponent();
+            dtpPayDate.Value = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day);
             notificationIcon.Visible = false;
 
             if (File.Exists("users.json"))
@@ -49,7 +50,7 @@ namespace CalendarTest
                         foreach (SavableUserData user in SavableUsers)
                         {
                             UserListView.Items.Add(user.DisplayName);
-                            Users.Add(new User(user.DisplayName, user.ID));
+                            Users.Add(new User(user.DisplayName, user.EmployeeNumber, user.ID));
                         }
                         UserListView.Select();
                         UserListView.Items[0].Selected = true;
@@ -75,10 +76,7 @@ namespace CalendarTest
 
         private void btnCreateTimesheet_Click(object sender, EventArgs e)
         {
-            //string StartDate = Prompt.ShowDialog("Please enter the first date of the timesheet in YYYY-MM-DD format.", "Timehseet start date.");
-            var StartDate = "2019-01-15";
-            if (StartDate.Length != 10) { MessageBox.Show("Date entered is invalid."); return; }
-            List<Event> TimesheetEvents = TSheetsListTimesheetEvents(CurrentUser, StartDate);
+            List<Event> TimesheetEvents = TSheetsListTimesheetEvents(CurrentUser, dtpPayDate.Value.AddDays(-20));
             List<Event> MergedEvents = new List<Event>();
             
             Event LatestEvent = null;
@@ -117,7 +115,8 @@ namespace CalendarTest
 
             Template.SpreadsheetId = null;
             Template.SpreadsheetUrl = null;
-
+            Template.Properties.Title = "CDC Timesheet (" + dtpPayDate.Value.ToString("yyyy-MM-dd") + ")";
+            
             SpreadsheetsResource.CreateRequest request = new SpreadsheetsResource.CreateRequest(
                 CurrentUser.GoogleSheetsService,
                 Template
@@ -126,71 +125,303 @@ namespace CalendarTest
 
             var ID = NewSpreadsheet.SpreadsheetId;
 
-            var reqs = new BatchUpdateSpreadsheetRequest();
-            reqs.Requests = new List<Request>();
+            var reqs = new BatchUpdateSpreadsheetRequest
+            {
+                Requests = new List<Request>()
+            };
 
-            reqs.Requests.Add(UpdateCellValue("B2", new string[,] { { "Test" } }, Template));
-            
-            
+            reqs.Requests.Add(UpdateCellValue("C3", CurrentUser.EmployeeNumber, Template));
+            reqs.Requests.Add(UpdateCellValue("C6", CurrentUser.DisplayName, Template));
+            reqs.Requests.Add(UpdateCellValue("V2", dtpPayDate.Value.ToString("MM/dd/yyyy"), Template));
+            var Week1 = new string[7,12];
+            double WeekTotal1 = 0;
+            double RegTimeTotal1 = 0;
+            double OverTimeTotal1 = 0;
+            double PTOTimeTotal1 = 0;
+            double HDPTimeTotal1 = 0;
+            for (int i = 0; i < 7; i++)
+            {
+                int Shifts = 0;
+                var Date = dtpPayDate.Value.AddDays(i - 20);
+                double PTOTime = 0;
+                double HDPTime = 0;
+                double OverTime = 0;
+                double RegTime = 0;
+                double DayTotal = 0;
+                foreach (var Event in MergedEvents)
+                {
+                    if (Date.Month == Event.Start.Month && Date.Day == Event.Start.Day)
+                    {
+                        if (Event.PTO > 0)
+                        {
+                            PTOTime += Event.PTO;
+                            PTOTimeTotal1 += Event.PTO;
+                            DayTotal += Event.PTO;
+                            WeekTotal1 += Event.PTO;
+                        }
+                        else if (Event.HDP > 0)
+                        {
+                            HDPTime += Event.HDP;
+                            HDPTimeTotal1 += Event.HDP;
+                            DayTotal += Event.HDP;
+                            WeekTotal1 += Event.HDP;
+                        }
+                        else
+                        {
+                            Week1[i, Shifts] = Event.Start.ToString("h:mm tt");
+                            if (Week1[i, Shifts] == "00:00 AM")
+                            {
+                                Week1[i, Shifts] = "12:00 PM";
+                            }
+                            Week1[i, Shifts + 1] = Event.End.ToString("h:mm tt");
+                            if (Week1[i, Shifts + 1] == "00:00 AM")
+                            {
+                                Week1[i, Shifts + 1] = "12:00 PM";
+                            }
+                            DayTotal += (Event.End - Event.Start).TotalHours;
+                            RegTime += (Event.End - Event.Start).TotalHours;
+                            Shifts++;
+                        }
+                    }
+                }
+                if (RegTime > 0)
+                {
+                    var RegWeekTimeLeft = 40 - RegTimeTotal1;
+                    if (RegWeekTimeLeft > 0)
+                    {
+                        if (RegWeekTimeLeft < RegTime)
+                        {
+                            OverTime += RegTime - RegWeekTimeLeft;
+                            RegTime = RegWeekTimeLeft;
+                        }
+                    }
+                    else
+                    {
+                        OverTime += RegTime;
+                        RegTime = 0;
+                    }
+                    WeekTotal1 += RegTime + OverTime;
+                    RegTimeTotal1 += RegTime;
+                    OverTimeTotal1 += OverTime;
+                    if (RegTime > 0)
+                    {
+                        Week1[i, 6] = RegTime.ToString();
+                    }
+                }
+                if (OverTime > 0)
+                {
+                    Week1[i, 7] = OverTime.ToString();
+                }
+                if (PTOTime > 0)
+                {
+                    Week1[i, 8] = PTOTime.ToString();
+                }
+                if (HDPTime > 0)
+                {
+                    Week1[i, 9] = HDPTime.ToString();
+                }
+                Week1[i, 11] = DayTotal.ToString();
+            }
+            reqs.Requests.Add(UpdateCellValue("C12", Week1, Template));
+            reqs.Requests.Add(UpdateCellValue("I19", new string[,] { { RegTimeTotal1.ToString(), OverTimeTotal1.ToString(), PTOTimeTotal1.ToString(), HDPTimeTotal1.ToString(), "", WeekTotal1.ToString() } }, Template));
 
-            
+            var Week2 = new string[7, 12];
+            double WeekTotal2 = 0;
+            double RegTimeTotal2 = 0;
+            double OverTimeTotal2 = 0;
+            double PTOTimeTotal2 = 0;
+            double HDPTimeTotal2 = 0;
+            for (int i = 0; i < 7; i++)
+            {
+                int Shifts = 0;
+                var Date = dtpPayDate.Value.AddDays(i - 20);
+                double PTOTime = 0;
+                double HDPTime = 0;
+                double OverTime = 0;
+                double RegTime = 0;
+                double DayTotal = 0;
+                foreach (var Event in MergedEvents)
+                {
+                    if (Date.Month == Event.Start.Month && Date.Day == Event.Start.Day)
+                    {
+                        if (Event.PTO > 0)
+                        {
+                            PTOTime += Event.PTO;
+                            PTOTimeTotal2 += Event.PTO;
+                            DayTotal += Event.PTO;
+                            WeekTotal2 += Event.PTO;
+                        }
+                        else if (Event.HDP > 0)
+                        {
+                            HDPTime += Event.HDP;
+                            HDPTimeTotal2 += Event.HDP;
+                            DayTotal += Event.HDP;
+                            WeekTotal2 += Event.HDP;
+                        }
+                        else
+                        {
+                            Week2[i, Shifts] = Event.Start.ToString("h:mm tt");
+                            if (Week2[i, Shifts] == "00:00 AM")
+                            {
+                                Week2[i, Shifts] = "12:00 PM";
+                            }
+                            Week2[i, Shifts + 1] = Event.End.ToString("h:mm tt");
+                            if (Week2[i, Shifts + 1] == "00:00 AM")
+                            {
+                                Week2[i, Shifts + 1] = "12:00 PM";
+                            }
+                            DayTotal += (Event.End - Event.Start).TotalHours;
+                            RegTime += (Event.End - Event.Start).TotalHours;
+                            Shifts++;
+                        }
+                    }
+                }
+                if (RegTime > 0)
+                {
+                    var RegWeekTimeLeft = 40 - RegTimeTotal2;
+                    if (RegWeekTimeLeft > 0)
+                    {
+                        if (RegWeekTimeLeft < RegTime)
+                        {
+                            OverTime += RegTime - RegWeekTimeLeft;
+                            RegTime = RegWeekTimeLeft;
+                        }
+                    }
+                    else
+                    {
+                        OverTime += RegTime;
+                        RegTime = 0;
+                    }
+                    WeekTotal2 += RegTime + OverTime;
+                    RegTimeTotal2 += RegTime;
+                    OverTimeTotal2 += OverTime;
+                    if (RegTime > 0)
+                    {
+                        Week2[i, 6] = RegTime.ToString();
+                    }
+                }
+                if (OverTime > 0)
+                {
+                    Week2[i, 7] = OverTime.ToString();
+                }
+                if (PTOTime > 0)
+                {
+                    Week2[i, 8] = PTOTime.ToString();
+                }
+                if (HDPTime > 0)
+                {
+                    Week2[i, 9] = HDPTime.ToString();
+                }
+                Week2[i, 11] = DayTotal.ToString();
+            }
+            reqs.Requests.Add(UpdateCellValue("C20", Week2, Template));
+            reqs.Requests.Add(UpdateCellValue("I27", new string[,] { { RegTimeTotal2.ToString(), OverTimeTotal2.ToString(), PTOTimeTotal2.ToString(), HDPTimeTotal2.ToString(), "", WeekTotal2.ToString() } }, Template));
+
+
             // Execute request
-            var response = CurrentUser.GoogleSheetsService.Spreadsheets.BatchUpdate(reqs, ID).Execute(); // Replace Spreadsheet.SpreadsheetId with your recently created spreadsheet ID
+            var response = CurrentUser.GoogleSheetsService.Spreadsheets.BatchUpdate(reqs, ID).Execute();
 
             System.Diagnostics.Process.Start(NewSpreadsheet.SpreadsheetUrl);
         }
 
-        private Request UpdateCellValue(string Range, string[,] Value, Spreadsheet Template)
+        private void dtpPayDate_ValueChanged(object sender, EventArgs e)
+        {
+            LoadUser();
+        }
+
+        private Request UpdateCellValue(string StartCell, int Value, Spreadsheet Template)
+        {
+            return UpdateCellValue(StartCell, new int[,] { { Value } }, Template);
+        }
+
+        private Request UpdateCellValue(string StartCell, string Value, Spreadsheet Template)
+        {
+            return UpdateCellValue(StartCell, new string[,] { { Value } }, Template);
+        }
+
+        private Request UpdateCellValue(string StartCell, string[,] Values, Spreadsheet Template)
         {
             // Create starting coordinate where data would be written to
 
-            var StartRow = RowFromCellString(Range);
-            var StartColumn = ColumnFromCellString(Range);
-            var EndRow = RowFromCellString(Range);
-            var EndColumn = ColumnFromCellString(Range);
-
             GridCoordinate gridCoordinate = new GridCoordinate();
-            gridCoordinate.ColumnIndex = StartColumn;
-            gridCoordinate.RowIndex = StartRow;
-            gridCoordinate.SheetId = 542233618; // Your specific sheet ID here
+            gridCoordinate.ColumnIndex = ColumnFromCellString(StartCell);
+            gridCoordinate.RowIndex = RowFromCellString(StartCell);
+            gridCoordinate.SheetId = Template.Sheets[0].Properties.SheetId;
 
             var request = new Request();
             request.UpdateCells = new UpdateCellsRequest();
             request.UpdateCells.Start = gridCoordinate;
             request.UpdateCells.Fields = "*"; // needed by API, throws error if null
 
-            foreach (var Row in Value)
+            List<RowData> listRowData = new List<RowData>();
+
+            for (int Row = 0; Row < Values.GetLength(0); Row += 1)
             {
-                RowData rowData = new RowData();
                 List<CellData> listCellData = new List<CellData>();
 
-                foreach (var Cell in Row)
+                for (int Column = 0; Column < Values.GetLength(1); Column += 1)
                 {
-                    ExtendedValue extendedValue = new ExtendedValue();
-                    extendedValue.StringValue = Cell;
-
                     CellData cellData = new CellData();
-                    cellData.UserEnteredValue = extendedValue;
-                    cellData.EffectiveFormat = Template.Sheets[0].Data[0].RowData[Row].Values[Column].EffectiveFormat;
+                    cellData.UserEnteredValue = new ExtendedValue() { StringValue = Values[Row, Column] };
+                    cellData.EffectiveFormat = Template.Sheets[0].Data[0].RowData[(int)gridCoordinate.RowIndex + Row].Values[(int)gridCoordinate.ColumnIndex + Column].EffectiveFormat;
+                    cellData.UserEnteredFormat = Template.Sheets[0].Data[0].RowData[(int)gridCoordinate.RowIndex + Row].Values[(int)gridCoordinate.ColumnIndex + Column].UserEnteredFormat;
+
                     listCellData.Add(cellData);
                 }
 
-                // Assigning data to cells
-                
-                
-
-                rowData.Values = listCellData;
+                RowData rowData = new RowData() { Values = listCellData };
 
                 // Put cell data into a row
-                List<RowData> listRowData = new List<RowData>();
+                
                 listRowData.Add(rowData);
-                request.UpdateCells.Rows = listRowData;
             }
-            
+
+            request.UpdateCells.Rows = listRowData;
             return request;
         }
 
-        private int ColumnFromCellString(string Cell)
+        private Request UpdateCellValue(string StartCell, int[,] Values, Spreadsheet Template)
+        {
+            // Create starting coordinate where data would be written to
+
+            GridCoordinate gridCoordinate = new GridCoordinate();
+            gridCoordinate.ColumnIndex = ColumnFromCellString(StartCell);
+            gridCoordinate.RowIndex = RowFromCellString(StartCell);
+            gridCoordinate.SheetId = Template.Sheets[0].Properties.SheetId;
+
+            var request = new Request();
+            request.UpdateCells = new UpdateCellsRequest();
+            request.UpdateCells.Start = gridCoordinate;
+            request.UpdateCells.Fields = "*"; // needed by API, throws error if null
+
+            List<RowData> listRowData = new List<RowData>();
+
+            for (int Row = 0; Row < Values.GetLength(0); Row += 1)
+            {
+                List<CellData> listCellData = new List<CellData>();
+
+                for (int Column = 0; Column < Values.GetLength(1); Column += 1)
+                {
+                    CellData cellData = new CellData();
+                    cellData.UserEnteredValue = new ExtendedValue() { NumberValue = Values[Row, Column] };
+                    cellData.EffectiveFormat = Template.Sheets[0].Data[0].RowData[(int)gridCoordinate.RowIndex + Row].Values[(int)gridCoordinate.ColumnIndex + Column].EffectiveFormat;
+                    cellData.UserEnteredFormat = Template.Sheets[0].Data[0].RowData[(int)gridCoordinate.RowIndex + Row].Values[(int)gridCoordinate.ColumnIndex + Column].UserEnteredFormat;
+
+                    listCellData.Add(cellData);
+                }
+
+                RowData rowData = new RowData() { Values = listCellData };
+
+                // Put cell data into a row
+
+                listRowData.Add(rowData);
+            }
+
+            request.UpdateCells.Rows = listRowData;
+            return request;
+        }
+
+        private int ColumnFromCellString(string Cell, bool End = false)
         {
             Regex rx = new Regex(@"([a-z]+)[0-9]+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
             var Column = rx.Match(Cell).Groups[1].Value;
@@ -201,13 +432,13 @@ namespace CalendarTest
                 sum *= 26;
                 sum += (Column[i] - 'A' + 1);
             }
-            return sum;
+            return sum - 1;
         }
 
-        private int RowFromCellString(string Cell)
+        private int RowFromCellString(string Cell, bool End = false)
         {
             Regex rx = new Regex(@"[a-z]+([0-9]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-            return int.Parse(rx.Match(Cell).Groups[1].Value);
+            return int.Parse(rx.Match(Cell).Groups[1].Value) - 1;
         }
 
         private bool maxedWhenTrayed = false;
@@ -416,8 +647,9 @@ namespace CalendarTest
             {
                 // Define parameters of request.
                 EventsResource.ListRequest request = user.GoogleCalendarService.Events.List(user.Calendar);
-                request.TimeMin = DateTime.Now.AddDays(-7);
-                request.TimeMax = DateTime.Now.AddDays(14);
+
+                request.TimeMin = dtpPayDate.Value.AddDays(-20);
+                request.TimeMax = dtpPayDate.Value.AddDays(-6);
                 request.ShowDeleted = false;
                 request.SingleEvents = true;
                 request.OrderBy = EventsResource.ListRequest.OrderByEnum.StartTime;
@@ -566,22 +798,38 @@ namespace CalendarTest
 
         private List<Event> TSheetsListScheduleEvents(User user)
         {
-            TSheetsEventsList.Items.Clear();
-
             var tsheetsApi = new RestClient(user.TSheetsConnection, user.TSheetsAuthProvider);
 
+            var ScheduleID = (int)JObject.Parse(tsheetsApi.Get(ObjectType.ScheduleCalendars)).SelectTokens("results.schedule_calendars.*").First()["id"];
             var filters = new Dictionary<string, string>();
-            var N = DateTime.Now.AddDays(-7);
-            filters.Add("start", N.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'") + "00+00:00");
-            N = DateTime.Now.AddDays(14);
-            filters.Add("end", N.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'") + "00+00:00");
-            filters.Add("schedule_calendar_ids", "173108");
-            var ScheduleData = tsheetsApi.Get(ObjectType.ScheduleEvents, filters);
-            var ScheduleEventsObject = JObject.Parse(ScheduleData);
-            var allScheduleEvents = ScheduleEventsObject.SelectTokens("results.schedule_events.*");
+            var N = dtpPayDate.Value.AddDays(-20);
+            filters.Add("start", N.ToString("yyyy'-'MM'-'dd'T'") + "00:00:00+00:00");
+            N = dtpPayDate.Value.AddDays(-6);
+            filters.Add("end", N.ToString("yyyy'-'MM'-'dd'T'") + "00:00:00+00:00");
+            filters.Add("schedule_calendar_ids", ScheduleID.ToString());
+            var ScheduleData = JObject.Parse(tsheetsApi.Get(ObjectType.ScheduleEvents, filters));
+            var allScheduleEvents = ScheduleData.SelectTokens("results.schedule_events.*");
 
-            var jobcodesData = tsheetsApi.Get(ObjectType.Jobcodes);
-            var jobcodesObject = JObject.Parse(jobcodesData)["results"]["jobcodes"];
+            Dictionary<int, string> Jobs = new Dictionary<int, string>() { { 0, "Untitled" } };
+
+            var jobcodesObject = JObject.Parse(tsheetsApi.Get(ObjectType.Jobcodes))["results"]["jobcodes"];
+            foreach (var Jobcode in jobcodesObject)
+            {
+                foreach (var J in Jobcode)
+                {
+                    Jobs.Add((int)J["id"], (string)J["name"]);
+                }
+            }
+
+            Dictionary<int, string> PTOCodes = new Dictionary<int, string>();
+            jobcodesObject = JObject.Parse(tsheetsApi.Get(ObjectType.Jobcodes, new Dictionary<string, string>() { { "type", "pto" } }))["results"]["jobcodes"];
+            foreach (var Jobcode in jobcodesObject)
+            {
+                foreach (var J in Jobcode)
+                {
+                    PTOCodes.Add((int)J["id"], (string)J["name"]);
+                }
+            }
 
             var Events = new List<Event>();
 
@@ -589,78 +837,139 @@ namespace CalendarTest
             {
                 var tsUser = ScheduleEvent.SelectToken("supplemental_data.users." + ScheduleEvent["user_id"]);
 
-                var JobCode = ScheduleEvent["jobcode_id"].ToString();
-                JobCode = JobCode == "0" ? "Untitled" : jobcodesObject[JobCode]["name"].ToString();
-                var eventListViewItem = new ListViewItem(string.Format("{0}", JobCode));
-                eventListViewItem.SubItems.Add(string.Format("{0:g}-{1:t}", ScheduleEvent["start"], ScheduleEvent["end"]));
-                TSheetsEventsList.Items.Add(eventListViewItem);
+                var JobcodeID = (int)ScheduleEvent["jobcode_id"];
+                string JobName = "Untitled";
+                bool PTO = false;
+                if (Jobs.ContainsKey(JobcodeID))
+                {
+                    JobName = Jobs[JobcodeID];
+                }
+                else if (PTOCodes.ContainsKey(JobcodeID))
+                {
+                    JobName = PTOCodes[JobcodeID];
+                    PTO = true;
+                }
 
                 Event E = new Event
                 {
                     Type = Event.EventType.TSheets,
-                    Start = (DateTime)ScheduleEvent["start"],
-                    End = (DateTime)ScheduleEvent["end"],
-                    Job = JobCode,
+                    Job = JobName,
                     TSheetsID = (string)ScheduleEvent["id"],
-                    URL = user.URL
+                    URL = user.URL,
+                    Start = (DateTime)ScheduleEvent["start"],
+                    End = (DateTime)ScheduleEvent["end"]
                 };
+                
                 Events.Add(E);
+            }
+            Events.Sort((x, y) => x.Start.CompareTo(y.Start));
+            TSheetsEventsList.Items.Clear();
+            foreach (var Event in Events)
+            {
+                var eventListViewItem = new ListViewItem(Event.Job);
+                eventListViewItem.SubItems.Add(string.Format("{0}-{1}", Event.Start.ToString("MM/dd/yyyy HH:mm tt"), Event.End.ToString("HH:mm tt")));
+                TSheetsEventsList.Items.Add(eventListViewItem);
             }
             return Events;
         }
 
-        private List<Event> TSheetsListTimesheetEvents(User user, string StartDate)
+        private List<Event> TSheetsListTimesheetEvents(User user, DateTime StartDate)
         {
             TSheetsEventsList.Items.Clear();
 
             var tsheetsApi = new RestClient(user.TSheetsConnection, user.TSheetsAuthProvider);
 
             var filters = new Dictionary<string, string>();
-            var N = new DateTime(int.Parse(StartDate.Substring(0, 4)), int.Parse(StartDate.Substring(5, 2)), int.Parse(StartDate.Substring(8, 2)));
-            filters.Add("start_date", StartDate);
-            N = DateTime.Now.AddDays(14);
-            filters.Add("end_date", N.ToString("yyyy'-'MM'-'dd"));
+            filters.Add("start_date", StartDate.ToString("yyyy'-'MM'-'dd"));
+            filters.Add("end_date", StartDate.AddDays(14).ToString("yyyy'-'MM'-'dd"));
             var ScheduleData = tsheetsApi.Get(ObjectType.Timesheets, filters);
             var ScheduleEventsObject = JObject.Parse(ScheduleData);
             var allScheduleEvents = ScheduleEventsObject.SelectTokens("results.timesheets.*");
 
-            var jobcodesData = tsheetsApi.Get(ObjectType.Jobcodes);
-            var jobcodesObject = JObject.Parse(jobcodesData)["results"]["jobcodes"];
+            Dictionary<int, string> Jobs = new Dictionary<int, string>() { { 0, "Untitled" } };
+
+            var jobcodesObject = JObject.Parse(tsheetsApi.Get(ObjectType.Jobcodes))["results"]["jobcodes"];
+            foreach (var Jobcode in jobcodesObject)
+            {
+                foreach (var J in Jobcode)
+                {
+                    Jobs.Add((int)J["id"], (string)J["name"]);
+                }
+            }
+
+            Dictionary<int, string> PTOCodes = new Dictionary<int, string>();
+            jobcodesObject = JObject.Parse(tsheetsApi.Get(ObjectType.Jobcodes, new Dictionary<string, string>() { { "type", "pto" } }))["results"]["jobcodes"];
+            foreach (var Jobcode in jobcodesObject)
+            {
+                foreach (var J in Jobcode)
+                {
+                    PTOCodes.Add((int)J["id"], (string)J["name"]);
+                }
+            }
 
             var Events = new List<Event>();
 
             foreach (var TimesheetEvent in allScheduleEvents)
             {
                 var tsUser = TimesheetEvent.SelectToken("supplemental_data.users." + TimesheetEvent["user_id"]);
-
-                var JobCode = TimesheetEvent["jobcode_id"].ToString();
-                JobCode = JobCode == "0" ? "Untitled" : jobcodesObject[JobCode]["name"].ToString();
-                var eventListViewItem = new ListViewItem(string.Format("{0}", JobCode));
-                eventListViewItem.SubItems.Add(string.Format("{0:g}-{1:t}", TimesheetEvent["start"], TimesheetEvent["end"]));
-                TSheetsEventsList.Items.Add(eventListViewItem);
+                var JobcodeID = (int)TimesheetEvent["jobcode_id"];
+                string JobName = "Untitled";
+                int Type = 0;
+                if (Jobs.ContainsKey(JobcodeID))
+                {
+                    JobName = Jobs[JobcodeID];
+                }
+                else if (PTOCodes.ContainsKey(JobcodeID))
+                {
+                    JobName = PTOCodes[JobcodeID];
+                    if (JobName == "Holiday")
+                    {
+                        Type = 1;
+                    }
+                    else if (JobName == "PTO")
+                    {
+                        Type = 2;
+                    }
+                }
 
                 Event E = new Event
                 {
                     Type = Event.EventType.TSheets,
-                    Start = (DateTime)TimesheetEvent["start"],
-                    End = (DateTime)TimesheetEvent["end"],
-                    Job = JobCode,
+                    Job = JobName,
                     TSheetsID = (string)TimesheetEvent["id"],
                     URL = user.URL
                 };
+                if (Type == 0)
+                {
+                    E.Start = (DateTime)TimesheetEvent["start"];
+                    E.End = (DateTime)TimesheetEvent["end"];
+                }
+                else
+                {
+                    var Date = (string)TimesheetEvent["date"];
+                    E.Start = new DateTime(int.Parse(Date.Substring(0, 4)), int.Parse(Date.Substring(5, 2)), int.Parse(Date.Substring(8, 2)));
+                    E.End = E.Start;
+                    if (Type == 1)
+                    {
+                        E.HDP = (double)TimesheetEvent["duration"] / 3600;
+                    }
+                    else if (Type == 2)
+                    {
+                        E.PTO = (double)TimesheetEvent["duration"] / 3600;
+                    }
+                }
                 Events.Add(E);
             }
-            //Events.Sort((x, y) => x.Start.CompareTo(y.Start));
             return Events;
         }
 
-        private static List<Event> GoogleCalendarListEvents(User user)
+        private List<Event> GoogleCalendarListEvents(User user)
         {
             List<Event> Events = new List<Event>();
 
             EventsResource.ListRequest request = user.GoogleCalendarService.Events.List(user.Calendar);
-            request.TimeMin = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day - 7);
-            request.TimeMax = request.TimeMin.Value.AddDays(21);
+            request.TimeMin = dtpPayDate.Value.AddDays(-20);
+            request.TimeMax = dtpPayDate.Value.AddDays(-6);
             request.ShowDeleted = false;
             request.SingleEvents = true;
             request.OrderBy = EventsResource.ListRequest.OrderByEnum.StartTime;
@@ -694,18 +1003,22 @@ namespace CalendarTest
             string userName = Prompt.ShowDialog("Please enter new user's name.", "Name to be displayed.");
             if (userName != "")
             {
-                User user = new User(userName);
-                Users.Add(user);
-                CurrentUser = user;
-                using (StreamWriter file = File.CreateText("users.json"))
+                int employeeNumber;
+                if (int.TryParse(Prompt.ShowDialog("Please enter " + userName + "'s employee number.", "Emplyee Number"), out employeeNumber))
                 {
-                    JsonSerializer serializer = new JsonSerializer();
-                    serializer.Serialize(file, Users);
-                }
-                LoadUser(user);
+                    User user = new User(userName, employeeNumber);
+                    Users.Add(user);
+                    CurrentUser = user;
+                    using (StreamWriter file = File.CreateText("users.json"))
+                    {
+                        JsonSerializer serializer = new JsonSerializer();
+                        serializer.Serialize(file, Users);
+                    }
+                    LoadUser(user);
 
-                UserListView.Items.Add(user.DisplayName);
-                UserListView.Items[UserListView.Items.Count - 1].Selected = true;
+                    UserListView.Items.Add(user.DisplayName);
+                    UserListView.Items[UserListView.Items.Count - 1].Selected = true;
+                }
             }
         }
 
@@ -725,8 +1038,6 @@ namespace CalendarTest
                     CancellationToken.None,
                     new FileDataStore(credPath, true)).Result;
                 Console.WriteLine("Credential file saved to: " + credPath);
-
-                
             }
 
             // Create Google Calendar API service.
@@ -789,6 +1100,7 @@ namespace CalendarTest
         public class User
         {
             public string DisplayName;
+            public int EmployeeNumber;
             public int ID;
             public string URL;
             public string Calendar;
@@ -805,18 +1117,20 @@ namespace CalendarTest
             public ConnectionInfo TSheetsConnection;
             public IOAuth2 TSheetsAuthProvider;
 
-            public User(string displayName)
+            public User(string displayName, int employeeNumber)
             {
                 DisplayName = displayName;
                 ID = (new Random()).Next(1, 999999999);
+                EmployeeNumber = employeeNumber;
                 InitializeAuths(this);
             }
 
             [JsonConstructor]
-            public User(string displayName, int id)
+            public User(string displayName, int employeeNumber, int id)
             {
                 DisplayName = displayName;
                 ID = id;
+                EmployeeNumber = employeeNumber;
                 InitializeAuths(this);
             }
 
@@ -832,6 +1146,7 @@ namespace CalendarTest
                 var SavableData = new SavableUserData();
                 SavableData.ID = ID;
                 SavableData.DisplayName = DisplayName;
+                SavableData.EmployeeNumber = EmployeeNumber;
                 SavableData.URL = URL;
                 SavableData.Calendar = Calendar;
                 SavableData.CalendarName = CalendarName;
@@ -842,6 +1157,7 @@ namespace CalendarTest
         public class SavableUserData
         {
             public string DisplayName;
+            public int EmployeeNumber;
             public int ID;
             public string URL;
             public string Calendar;
@@ -866,6 +1182,8 @@ namespace CalendarTest
             public string GoogleCalendarID;
             public string TSheetsID;
             public string URL;
+            public double PTO = 0;
+            public double HDP = 0;
         }
 
         public static class Prompt
@@ -880,7 +1198,7 @@ namespace CalendarTest
                     Text = caption,
                     StartPosition = FormStartPosition.CenterScreen
                 };
-                Label textLabel = new Label() { Left = 50, Top = 20, Text = text };
+                Label textLabel = new Label() { Left = 50, Top = 20, Text = text, Width = 400 };
                 TextBox textBox = new TextBox() { Left = 50, Top = 50, Width = 400 };
                 Button confirmation = new Button() { Text = "Ok", Left = 350, Width = 100, Top = 70, DialogResult = DialogResult.OK };
                 confirmation.Click += (sender, e) => { prompt.Close(); };

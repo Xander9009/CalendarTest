@@ -54,12 +54,14 @@
             this.splitContainer3 = new System.Windows.Forms.SplitContainer();
             this.splitContainer4 = new System.Windows.Forms.SplitContainer();
             this.splitContainer5 = new System.Windows.Forms.SplitContainer();
+            this.btnCreateTimesheet = new System.Windows.Forms.Button();
             this.lblCalendar = new System.Windows.Forms.LinkLabel();
             this.label5 = new System.Windows.Forms.Label();
             this.btnRefresh = new System.Windows.Forms.Button();
             this.btnSync = new System.Windows.Forms.Button();
             this.lblURL = new System.Windows.Forms.LinkLabel();
-            this.btnCreateTimesheet = new System.Windows.Forms.Button();
+            this.dtpPayDate = new System.Windows.Forms.DateTimePicker();
+            this.label7 = new System.Windows.Forms.Label();
             this.menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
@@ -340,6 +342,8 @@
             // 
             // splitContainer5.Panel1
             // 
+            this.splitContainer5.Panel1.Controls.Add(this.label7);
+            this.splitContainer5.Panel1.Controls.Add(this.dtpPayDate);
             this.splitContainer5.Panel1.Controls.Add(this.btnCreateTimesheet);
             this.splitContainer5.Panel1.Controls.Add(this.lblCalendar);
             this.splitContainer5.Panel1.Controls.Add(this.label5);
@@ -358,6 +362,17 @@
             this.splitContainer5.Size = new System.Drawing.Size(588, 426);
             this.splitContainer5.SplitterDistance = 84;
             this.splitContainer5.TabIndex = 0;
+            // 
+            // btnCreateTimesheet
+            // 
+            this.btnCreateTimesheet.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnCreateTimesheet.Location = new System.Drawing.Point(478, 3);
+            this.btnCreateTimesheet.Name = "btnCreateTimesheet";
+            this.btnCreateTimesheet.Size = new System.Drawing.Size(98, 23);
+            this.btnCreateTimesheet.TabIndex = 16;
+            this.btnCreateTimesheet.Text = "Create Timesheet";
+            this.btnCreateTimesheet.UseVisualStyleBackColor = true;
+            this.btnCreateTimesheet.Click += new System.EventHandler(this.btnCreateTimesheet_Click);
             // 
             // lblCalendar
             // 
@@ -408,16 +423,23 @@
             this.lblURL.TabIndex = 10;
             this.lblURL.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.lblURL_LinkClicked);
             // 
-            // btnCreateTimesheet
+            // dtpPayDate
             // 
-            this.btnCreateTimesheet.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnCreateTimesheet.Location = new System.Drawing.Point(478, 3);
-            this.btnCreateTimesheet.Name = "btnCreateTimesheet";
-            this.btnCreateTimesheet.Size = new System.Drawing.Size(98, 23);
-            this.btnCreateTimesheet.TabIndex = 16;
-            this.btnCreateTimesheet.Text = "Create Timesheet";
-            this.btnCreateTimesheet.UseVisualStyleBackColor = true;
-            this.btnCreateTimesheet.Click += new System.EventHandler(this.btnCreateTimesheet_Click);
+            this.dtpPayDate.Format = System.Windows.Forms.DateTimePickerFormat.Short;
+            this.dtpPayDate.Location = new System.Drawing.Point(478, 32);
+            this.dtpPayDate.Name = "dtpPayDate";
+            this.dtpPayDate.Size = new System.Drawing.Size(98, 20);
+            this.dtpPayDate.TabIndex = 17;
+            this.dtpPayDate.ValueChanged += new System.EventHandler(this.dtpPayDate_ValueChanged);
+            // 
+            // label7
+            // 
+            this.label7.AutoSize = true;
+            this.label7.Location = new System.Drawing.Point(421, 36);
+            this.label7.Name = "label7";
+            this.label7.Size = new System.Drawing.Size(51, 13);
+            this.label7.TabIndex = 18;
+            this.label7.Text = "Pay Date";
             // 
             // Form1
             // 
@@ -489,6 +511,8 @@
         private System.Windows.Forms.Label label5;
         private System.Windows.Forms.LinkLabel lblCalendar;
         private System.Windows.Forms.Button btnCreateTimesheet;
+        private System.Windows.Forms.Label label7;
+        private System.Windows.Forms.DateTimePicker dtpPayDate;
     }
 }
 
