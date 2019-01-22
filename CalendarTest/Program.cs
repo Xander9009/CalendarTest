@@ -2,6 +2,7 @@
 using System.Windows.Forms;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Sheets.v4;
+using Google.Apis.Drive.v3;
 
 namespace CalendarTest
 {
@@ -15,7 +16,7 @@ namespace CalendarTest
 
         // If modifying these scopes, delete your previously saved credentials
         // at ~/.credentials/calendar-dotnet-quickstart.json
-        public static string[] GoogleScopes = { CalendarService.Scope.CalendarReadonly, CalendarService.Scope.CalendarEvents, SheetsService.Scope.Spreadsheets };
+        public static string[] GoogleScopes = { CalendarService.Scope.CalendarReadonly, CalendarService.Scope.CalendarEvents, SheetsService.Scope.Spreadsheets, DriveService.Scope.DriveReadonly };
         public static string ApplicationName = "Google Calendar API .NET Quickstart";
         
         [STAThread]

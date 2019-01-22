@@ -21,6 +21,9 @@ using Google.Apis.Util.Store;
 using Google.Apis.Sheets.v4;
 using Google.Apis.Sheets.v4.Data;
 
+using Google.Apis.Drive.v3;
+using Google.Apis.Drive.v3.Data;
+
 using TSheets;
 using System.Text.RegularExpressions;
 
@@ -38,9 +41,9 @@ namespace CalendarTest
             dtpPayDate.Value = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day);
             notificationIcon.Visible = false;
 
-            if (File.Exists("users.json"))
+            if (System.IO.File.Exists("users.json"))
             {
-                using (StreamReader file = File.OpenText("users.json"))
+                using (StreamReader file = System.IO.File.OpenText("users.json"))
                 {
                     JsonSerializer serializer = new JsonSerializer();
                     SavableUsers = (List<SavableUserData>)serializer.Deserialize(file, typeof(List<SavableUserData>));
@@ -107,8 +110,17 @@ namespace CalendarTest
                 MergedEvents.Add(LatestEvent);
             }
 
+            var templateSearchRequest =  CurrentUser.GoogleDriveService.Files.List();
+            templateSearchRequest.Q = "name='CDC Timesheet Template'";
+            var templateSearchResponse = templateSearchRequest.Execute();
+            if (templateSearchResponse.Files.Count == 0)
+            {
+                MessageBox.Show("Template file not found. Please make a copy of the template file which this user owns.");
+                return;
+            }
+            var TemplateID = templateSearchResponse.Files[0].Id;
 
-            var getRequest = CurrentUser.GoogleSheetsService.Spreadsheets.Get("1uD1eclhcxHiWGj3raNbuLiTdI47cWoHV8AMJoikBx-8");
+            var getRequest = CurrentUser.GoogleSheetsService.Spreadsheets.Get(TemplateID);
             getRequest.Ranges = "A1:Z50";
             getRequest.IncludeGridData = true;
             var Template = getRequest.Execute();
@@ -569,9 +581,9 @@ namespace CalendarTest
 
             string savedToken;
             UserAuthentication userAuthProvider;
-            if (File.Exists(user.ID + "TStoken.json"))
+            if (System.IO.File.Exists(user.ID + "TStoken.json"))
             {
-                using (StreamReader file = File.OpenText(user.ID + "TStoken.json"))
+                using (StreamReader file = System.IO.File.OpenText(user.ID + "TStoken.json"))
                 {
                     JsonSerializer serializer = new JsonSerializer();
                     savedToken = (string)serializer.Deserialize(file, typeof(string));
@@ -615,7 +627,7 @@ namespace CalendarTest
             // to manually retrieve the most current token.
             savedToken = authToken.ToJson();
 
-            using (StreamWriter file = File.CreateText(user.ID + "TStoken.json"))
+            using (StreamWriter file = System.IO.File.CreateText(user.ID + "TStoken.json"))
             {
                 JsonSerializer serializer = new JsonSerializer();
                 serializer.Serialize(file, savedToken);
@@ -1009,7 +1021,7 @@ namespace CalendarTest
                     User user = new User(userName, employeeNumber);
                     Users.Add(user);
                     CurrentUser = user;
-                    using (StreamWriter file = File.CreateText("users.json"))
+                    using (StreamWriter file = System.IO.File.CreateText("users.json"))
                     {
                         JsonSerializer serializer = new JsonSerializer();
                         serializer.Serialize(file, Users);
@@ -1053,14 +1065,21 @@ namespace CalendarTest
                 HttpClientInitializer = user.GoogleCredential,
                 ApplicationName = Program.ApplicationName,
             });
+
+            // Create Google Drive API service.
+            user.GoogleDriveService = new DriveService(new BaseClientService.Initializer()
+            {
+                HttpClientInitializer = user.GoogleCredential,
+                ApplicationName = Program.ApplicationName,
+            });
         }
 
         internal static void TSheetsAuthenticate(User user)
         {
             TSheetsCredentials TSCreds = null;
-            if (File.Exists("tsheetscredentials.json"))
+            if (System.IO.File.Exists("tsheetscredentials.json"))
             {
-                using (StreamReader file = File.OpenText("tsheetscredentials.json"))
+                using (StreamReader file = System.IO.File.OpenText("tsheetscredentials.json"))
                 {
                     JsonSerializer serializer = new JsonSerializer();
                     TSCreds = (TSheetsCredentials)serializer.Deserialize(file, typeof(TSheetsCredentials));
@@ -1112,6 +1131,7 @@ namespace CalendarTest
             public UserCredential GoogleCredential;
             public CalendarService GoogleCalendarService;
             public SheetsService GoogleSheetsService;
+            public DriveService GoogleDriveService;
 
             //TSheets variables
             public ConnectionInfo TSheetsConnection;
